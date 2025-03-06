@@ -26,14 +26,27 @@ from pydantic import Field
 from utils.util import create_agent_from_yaml
 
 
-# This patetrn demonstrates how a debate between equally skilled models
+# This pattern demonstrates how a debate between equally skilled models
 # can deliver an outcome that exceeds the capability of the model if 
 # the task is handled as a single request-response in its entirety. 
-# We focus each agent on the subset of the whole task and thus get better results.
+# We focus each agent on the subset of the whole task and thus 
+# get better results.
 class DebateOrchestrator:
+    """
+    Orchestrates a debate between AI agents to produce higher quality responses.
+    
+    This class sets up and manages a conversation between Writer and Critic agents using
+    Semantic Kernel's Agent Group Chat functionality. The debate pattern improves response
+    quality by allowing specialized agents to focus on different aspects of the task.
+    """
     
     def __init__(self):
-
+        """
+        Initializes the DebateOrchestrator with necessary services and kernel configurations.
+        
+        Sets up Azure OpenAI connections for both executor and utility models, configures
+        the Semantic Kernel, and prepares execution settings for the agents.
+        """
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
         self.logger.info("Semantic Orchestrator Handler init")
@@ -82,7 +95,13 @@ class DebateOrchestrator:
     # Create Agent Group Chat
     # --------------------------------------------
     def create_agent_group_chat(self):
-
+        """
+        Creates and configures an agent group chat with Writer and Critic agents.
+        
+        Returns:
+            AgentGroupChat: A configured group chat with specialized agents, 
+                           selection strategy and termination strategy.
+        """
         self.logger.debug("Creating chat")
         
         writer = create_agent_from_yaml(service_id="executor",
@@ -107,7 +126,19 @@ class DebateOrchestrator:
     # --------------------------------------------
     # Using executor model since we need to process context - cognitive task
     def create_selection_strategy(self, agents, default_agent):
-        """Speaker selection strategy for the agent group chat."""
+        """
+        Creates a strategy to determine which agent speaks next in the conversation.
+        
+        Uses the executor model to analyze conversation context and select the most 
+        appropriate next speaker based on the conversation history.
+        
+        Args:
+            agents: List of available agents in the conversation.
+            default_agent: The fallback agent to use if selection fails.
+            
+        Returns:
+            KernelFunctionSelectionStrategy: A strategy for selecting the next speaker.
+        """
         definitions = "\n".join([f"{agent.name}: {agent.description}" for agent in agents])
         
         selection_function = KernelFunctionFromPrompt(
@@ -151,10 +182,17 @@ class DebateOrchestrator:
     # --------------------------------------------
     def create_termination_strategy(self, agents, maximum_iterations):
         """
-        Create a chat termination strategy that terminates when the Critic is satisfied
-        params:
-            agents: List of agents to trigger termination evaluation (critic only)
-            maximum_iterations: Maximum number of iterations before termination as a fallback mechanism
+        Creates a strategy to determine when the debate should end.
+        
+        The strategy terminates the conversation when the Critic agent's evaluation 
+        score exceeds a threshold (8.0) or when maximum iterations are reached.
+        
+        Args:
+            agents: List of agents that can trigger termination evaluation.
+            maximum_iterations: Maximum number of conversation turns before forced termination.
+            
+        Returns:
+            CompletionTerminationStrategy: A strategy for determining when to end the debate.
         """
 
         # Using UTILITY model - the task is simple - evaluation score extraction
@@ -200,11 +238,19 @@ class DebateOrchestrator:
                                              maximum_iterations=maximum_iterations)
         
     async def process_conversation(self, user_id, conversation_messages):
-        """ 
-        User ID is used for unique session id for AI Foundry Tracing 
-        conversation_messages: List of dictionaries with role, name and content.
-                               Allows for external chat history to be loaded.
+        """
+        Processes a conversation by orchestrating a debate between AI agents.
         
+        Manages the entire conversation flow, from initializing the agent group chat to
+        collecting and returning responses. Uses OpenTelemetry for tracing.
+        
+        Args:
+            user_id: Unique identifier for the user, used in session tracking.
+            conversation_messages: List of dictionaries with role, name and content
+                                  representing the conversation history.
+                                  
+        Yields:
+            Status updates during processing and the final response in JSON format.
         """
         agent_group_chat = self.create_agent_group_chat()
        
