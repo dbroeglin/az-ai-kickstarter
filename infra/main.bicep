@@ -176,11 +176,13 @@ var deployments = [
 
 var azureOpenAiApiEndpoint = azureOpenAi.outputs.endpoint
 var executorAzureOpenAiDeploymentName = deployments[0].name
-var utilityAzureOpenAiDeploymentName =  deployments[1].name
+var utilityAzureOpenAiDeploymentName = deployments[1].name
 
 var plannerAzureOpenAiApiVersion = empty(plannerApiVersionParam) ? '2024-12-01-preview' : plannerApiVersionParam
 var plannerAzureOpenAiApiEndpoint = empty(plannerEndpointParam) ? azureOpenAi.outputs.endpoint : plannerEndpointParam
-var plannerAzureOpenAiDeploymentName = empty(plannerDeploymentNameParam) ? deployments[0].name : plannerDeploymentNameParam
+var plannerAzureOpenAiDeploymentName = empty(plannerDeploymentNameParam)
+  ? deployments[0].name
+  : plannerDeploymentNameParam
 
 /* --------------------- Globally Unique Resource Names --------------------- */
 
@@ -197,8 +199,7 @@ var _azureOpenAiName = take(
   '${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}',
   63
 )
-var _aiSearchServiceName = take('${abbreviations.searchSearchServices}${environmentName}-${resourceToken}', 60) 
-
+var _aiSearchServiceName = take('${abbreviations.searchSearchServices}${environmentName}-${resourceToken}', 60)
 
 // These resources only require uniqueness within their scope/resource group
 var _applicationInsightsName = !empty(applicationInsightsName)
@@ -407,6 +408,7 @@ module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.10.
     logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
     daprAIConnectionString: appInsightsComponent.outputs.connectionString
     zoneRedundant: false
+    publicNetworkAccess: 'Enabled'
   }
 }
 
@@ -530,8 +532,8 @@ module backendApp 'modules/app/container-apps.bicep' = {
     containerRegistryName: containerRegistry.outputs.name
     exists: backendExists
     serviceName: 'backend' // Must match the service name in azure.yaml
-    externalIngressAllowed: false // Set to true if you intend to call backend from the locallly deployed frontend
-                                  // Setting to true will allow traffic from anywhere
+    externalIngressAllowed: true // Set to true if you intend to call backend from the locallly deployed frontend
+    // Setting to true will allow traffic from anywhere
     env: {
       // Required for container app daprAI
       APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
@@ -553,9 +555,11 @@ module backendApp 'modules/app/container-apps.bicep' = {
     }
     secrets: union(
       {},
-      empty(plannerKeyParam) ? {} : {
-        plannerkeysecret: plannerKeyParam
-      }
+      empty(plannerKeyParam)
+        ? {}
+        : {
+            plannerkeysecret: plannerKeyParam
+          }
     )
   }
 }
