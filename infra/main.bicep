@@ -184,35 +184,37 @@ var plannerAzureOpenAiDeploymentName = empty(plannerDeploymentNameParam) ? deplo
 
 /* --------------------- Globally Unique Resource Names --------------------- */
 
+// These resources require globally unique names
+var _storageAccountName = take(
+  '${abbreviations.storageStorageAccounts}${alphaNumericEnvironmentName}${resourceToken}',
+  24
+)
+var _containerRegistryName = !empty(containerRegistryName)
+  ? containerRegistryName
+  : take('${abbreviations.containerRegistryRegistries}${alphaNumericEnvironmentName}${resourceToken}', 50)
+var _keyVaultName = take('${abbreviations.keyVaultVaults}${alphaNumericEnvironmentName}-${resourceToken}', 24)
+var _azureOpenAiName = take(
+  '${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}',
+  63
+)
+
+// These resources only require uniqueness within their scope/resource group
 var _applicationInsightsName = !empty(applicationInsightsName)
   ? applicationInsightsName
   : take('${abbreviations.insightsComponents}${environmentName}', 255)
 var _logAnalyticsWorkspaceName = !empty(logAnalyticsWorkspaceName)
   ? logAnalyticsWorkspaceName
   : take('${abbreviations.operationalInsightsWorkspaces}${environmentName}', 63)
-
-var _storageAccountName = take(
-  '${abbreviations.storageStorageAccounts}${alphaNumericEnvironmentName}${resourceToken}',
-  24
-)
-var _azureOpenAiName = take(
-  '${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}',
-  63
-)
 var _aiHubName = take('${abbreviations.aiPortalHub}${environmentName}', 260)
 var _aiProjectName = take('${abbreviations.aiPortalProject}${environmentName}', 260)
-var _aiSearchServiceName = take('${abbreviations.searchSearchServices}${environmentName}', 260)
-
-var _containerRegistryName = !empty(containerRegistryName)
-  ? containerRegistryName
-  : take('${abbreviations.containerRegistryRegistries}${alphaNumericEnvironmentName}${resourceToken}', 50)
-var _keyVaultName = take('${abbreviations.keyVaultVaults}${alphaNumericEnvironmentName}-${resourceToken}', 24)
+var _aiSearchServiceName = take('${abbreviations.searchSearchServices}${environmentName}', 64) // Search service has a limit of 64 characters
 var _containerAppsEnvironmentName = !empty(containerAppsEnvironmentName)
   ? containerAppsEnvironmentName
   : take('${abbreviations.appManagedEnvironments}${environmentName}', 60)
 
 /* ----------------------------- Resource Names ----------------------------- */
 
+// These resources only require uniqueness within resource group
 var _frontendIdentityName = take(
   '${abbreviations.managedIdentityUserAssignedIdentities}frontend-${environmentName}',
   32
@@ -391,7 +393,7 @@ module containerRegistry 'modules/app/container-registry.bicep' = {
       _backendIdentityName
     ]
     tags: tags
-    name: '${abbreviations.containerRegistryRegistries}${resourceToken}'
+    name: _containerRegistryName // Changed from using token directly to using the variable
   }
 }
 
@@ -559,77 +561,77 @@ module backendApp 'modules/app/container-apps.bicep' = {
 /*                                   OUTPUTS                                  */
 /* -------------------------------------------------------------------------- */
 
-// Outputs are automatically saved in the local azd environment .env file.
-// To see these outputs, run `azd env get-values`,  or
+// These outputs are automatically saved in the local azd environment .env file.
+// To see these outputs, run `azd env get-values` or
 // `azd env get-values --output json` for json output.
 // To generate your own `.env` file run `azd env get-values > .env`
 
+/* --------------------------- Infrastructure Resources --------------------- */
 
-/* --------------------------- Apps Deployment ----------------------------- */
-
-@description('The endpoint of the container registry.') // necessary for azd deploy
+@description('The endpoint of the container registry used for image storage and deployment.')
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
 
-@description('Endpoint URL of the Frontend service')
+@description('Application Insights name - Use this to locate your application logs in the Azure portal')
+output AZURE_APPLICATION_INSIGHTS_NAME string = appInsightsComponent.outputs.name
+
+@description('Log Analytics Workspace name - Use this to query application logs and metrics')
+output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = logAnalyticsWorkspace.outputs.name
+
+@description('Application Insights connection string - Required for local development to send telemetry')
+output APPLICATIONINSIGHTS_CONNECTION_STRING string = appInsightsComponent.outputs.connectionString
+
+/* ---------------------------- App Service Endpoints ----------------------- */
+
+@description('Endpoint URL of the Frontend service - This is the main application URL for end users')
 output SERVICE_FRONTEND_URL string = frontendApp.outputs.URL
 
-@description('Endpoint URL of the Backend service')
+@description('Endpoint URL of the Backend service - Used by the frontend to make API calls')
 output SERVICE_BACKEND_URL string = backendApp.outputs.URL
-
 
 /* ------------------------ Authentication & RBAC -------------------------- */
 
-@description('Activate authentication if true')
+@description('Indicates if authentication is enabled for the application')
 output USE_AUTHENTICATION bool = useAuthentication
 
-@description('ID of the tenant we are deploying to')
+@description('ID of the tenant we are deploying to - Required for authentication flows')
 output AZURE_AUTH_TENANT_ID string = authTenantId
 
-@description('Principal ID of the user running the deployment')
+@description('Principal ID of the user running the deployment - Has admin rights to deployed resources')
 output AZURE_PRINCIPAL_ID string = azurePrincipalId
 
-@description('Application registration client ID')
+@description('Application registration client ID - Used by the application for auth flows')
 output AZURE_CLIENT_APP_ID string = authClientId
 
-/* ------------------------------- Models --------------------------------- */
+/* ------------------------------ OpenAI Models ----------------------------- */
 
-@description('Azure OpenAI endpoint')
+@description('Azure OpenAI endpoint - Base URL for API calls to Azure OpenAI')
 output AZURE_OPENAI_ENDPOINT string = azureOpenAiApiEndpoint
 
-@description('Azure OpenAI API Version')
+@description('Azure OpenAI API Version - API version to use when calling Azure OpenAI')
 output AZURE_OPENAI_API_VERSION string = azureOpenAiApiVersion
 
-@description('Azure OpenAI Model Deployment Name - Executor Service')
+@description('Azure OpenAI Model Deployment Name - Executor Service - Used for primary AI operations')
 output EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME string = executorAzureOpenAiDeploymentName
 
-@description('Azure OpenAI Model Deployment Name - Utility Service')
+@description('Azure OpenAI Model Deployment Name - Utility Service - Used for secondary AI operations')
 output UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME string = utilityAzureOpenAiDeploymentName
 
-@description('Azure OpenAI Model Deployment Name: Planner')
+@description('Azure OpenAI Model Deployment Name: Planner - Used for planning operations')
 output PLANNER_AZURE_OPENAI_DEPLOYMENT_NAME string = plannerAzureOpenAiDeploymentName
 
-@description('Azure OpenAI endpoint: Planner')
+@description('Azure OpenAI endpoint: Planner - URL for planner-specific API calls')
 output PLANNER_AZURE_OPENAI_ENDPOINT string = plannerAzureOpenAiApiEndpoint
 
-@description('Azure OpenAI API Version: Planner')
+@description('Azure OpenAI API Version: Planner - API version for planner operations')
 output PLANNER_AZURE_OPENAI_API_VERSION string = plannerAzureOpenAiApiVersion
 
-@description('Azure OpenAI Key: Planner')
+@description('Azure OpenAI Key: Planner - Key for planner operations (empty if using default)')
 output plannerkeysecret string = plannerKeyParam
 
-/* --------------------------- Observability ------------------------------ */
+/* -------------------------- Diagnostic Settings --------------------------- */
 
-@description('Application Insights name')
-output AZURE_APPLICATION_INSIGHTS_NAME string = appInsightsComponent.outputs.name
-
-@description('Log Analytics Workspace name')
-output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = logAnalyticsWorkspace.outputs.name
-
-@description('Application Insights connection string')
-output APPLICATIONINSIGHTS_CONNECTION_STRING string = appInsightsComponent.outputs.connectionString
-
-@description('Semantic Kernel Diagnostics')
+@description('Semantic Kernel Diagnostics - Controls whether telemetry is enabled')
 output SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS bool = true
 
-@description('Semantic Kernel Diagnostics: if set, content of the messages is traced. Set to false in production')
+@description('Semantic Kernel Diagnostics: Controls whether message content is traced. SECURITY NOTICE: Set to false in production to protect sensitive data')
 output SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS_SENSITIVE bool = true
