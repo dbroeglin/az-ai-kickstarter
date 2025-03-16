@@ -38,16 +38,20 @@ param externalIngressAllowed bool = true
 
 param exists bool
 
-var keyvalueSecrets = [for secret in items(secrets): {
-  name: secret.key
-  value: secret.value
-}]
+var keyvalueSecrets = [
+  for secret in items(secrets): {
+    name: secret.key
+    value: secret.value
+  }
+]
 
-var keyvaultIdentitySecrets = [for secret in items(keyvaultIdentities): {
-  name: secret.key
-  keyVaultUrl: secret.value.keyVaultUrl
-  identity: secret.value.identity
-}]
+var keyvaultIdentitySecrets = [
+  for secret in items(keyvaultIdentities): {
+    name: secret.key
+    keyVaultUrl: secret.value.keyVaultUrl
+    identity: secret.value.identity
+  }
+]
 
 var environment = [
   for key in objectKeys(env): {
@@ -65,7 +69,9 @@ var secret_refs = [
 
 var environmentVariables = union(environment, secret_refs)
 
-resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = { name: containerAppsEnvironmentName }
+resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
+  name: containerAppsEnvironmentName
+}
 
 module fetchLatestImage './fetch-container-image.bicep' = {
   name: '${name}-fetch-image'
@@ -78,7 +84,7 @@ module fetchLatestImage './fetch-container-image.bicep' = {
 resource app 'Microsoft.App/containerApps@2024-08-02-preview' = {
   name: name
   location: location
-  tags: union(tags, {'azd-service-name':  serviceName })
+  tags: union(tags, { 'azd-service-name': serviceName })
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: { '${identityId}': {} }
@@ -86,12 +92,12 @@ resource app 'Microsoft.App/containerApps@2024-08-02-preview' = {
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
     configuration: {
-      ingress:  {
+      ingress: {
         external: externalIngressAllowed
         targetPort: 8000
         transport: 'auto'
         corsPolicy: {
-          allowedOrigins: [ 'https://portal.azure.com', 'https://ms.portal.azure.com' ]
+          allowedOrigins: ['https://portal.azure.com', 'https://ms.portal.azure.com']
         }
       }
       registries: [
