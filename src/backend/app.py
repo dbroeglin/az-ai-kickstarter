@@ -5,13 +5,13 @@ This module initializes a FastAPI application that exposes endpoints for generat
 blog posts using a debate pattern orchestrator, with appropriate logging, tracing,
 and metrics configurations.
 """
-import json
 import logging
 import os
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
 from patterns.debate import DebateOrchestrator
 from utils.util import load_dotenv_from_azd, set_up_tracing, set_up_metrics, set_up_logging
+from chainlit.utils import mount_chainlit
 
 load_dotenv_from_azd()
 set_up_tracing()
@@ -32,6 +32,8 @@ orchestrator = DebateOrchestrator()
 app = FastAPI()
 
 logger.info("Diagnostics: %s", os.getenv('SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS'))
+
+mount_chainlit(app=app, target="ui.py", path="/")
 
 @app.post("/blog")
 async def http_blog(request_body: dict = Body(...)):
