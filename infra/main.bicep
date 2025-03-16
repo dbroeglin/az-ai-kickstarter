@@ -197,6 +197,8 @@ var _azureOpenAiName = take(
   '${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}',
   63
 )
+var _aiSearchServiceName = take('${abbreviations.searchSearchServices}${environmentName}-${resourceToken}', 60) 
+
 
 // These resources only require uniqueness within their scope/resource group
 var _applicationInsightsName = !empty(applicationInsightsName)
@@ -207,7 +209,6 @@ var _logAnalyticsWorkspaceName = !empty(logAnalyticsWorkspaceName)
   : take('${abbreviations.operationalInsightsWorkspaces}${environmentName}', 63)
 var _aiHubName = take('${abbreviations.aiPortalHub}${environmentName}', 260)
 var _aiProjectName = take('${abbreviations.aiPortalProject}${environmentName}', 260)
-var _aiSearchServiceName = take('${abbreviations.searchSearchServices}${environmentName}', 64) // Search service has a limit of 64 characters
 var _containerAppsEnvironmentName = !empty(containerAppsEnvironmentName)
   ? containerAppsEnvironmentName
   : take('${abbreviations.appManagedEnvironments}${environmentName}', 60)
