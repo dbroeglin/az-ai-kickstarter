@@ -8,10 +8,11 @@ and metrics configurations.
 import logging
 import os
 from fastapi import FastAPI, Body
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
 from patterns.debate import DebateOrchestrator
 from utils.util import load_dotenv_from_azd, set_up_tracing, set_up_metrics, set_up_logging
 from chainlit.utils import mount_chainlit
+import chainlit as cl
 
 load_dotenv_from_azd()
 set_up_tracing()
@@ -33,7 +34,7 @@ app = FastAPI()
 
 logger.info("Diagnostics: %s", os.getenv('SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS'))
 
-mount_chainlit(app=app, target="ui.py", path="/")
+mount_chainlit(app=app, target="ui.py", path="/ui")
 
 @app.post("/blog")
 async def http_blog(request_body: dict = Body(...)):
@@ -71,3 +72,10 @@ async def http_blog(request_body: dict = Body(...)):
             yield i + '\n'
 
     return StreamingResponse(doit(), media_type="application/json")
+
+@app.get("/")
+async def root():
+    """
+    Root endpoint that HTTP redirects to the Chainlit UI.
+    """
+    return RedirectResponse(url="/ui")
