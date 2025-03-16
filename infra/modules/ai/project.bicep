@@ -22,7 +22,7 @@ param location string = resourceGroup().location
 
 param tags object = {}
 
-resource project 'Microsoft.MachineLearningServices/workspaces@2024-01-01-preview' = {
+resource project 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = {
   name: name
   location: location
   tags: tags
@@ -41,7 +41,6 @@ resource project 'Microsoft.MachineLearningServices/workspaces@2024-01-01-previe
     publicNetworkAccess: publicNetworkAccess
     hubResourceId: hub.id
   }
-  
 }
 /*
 module mlServiceRoleDataScientist 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.1' = {
@@ -64,7 +63,7 @@ module mlServiceRoleSecretsReader 'br/public:avm/ptn/authorization/resource-role
   }
 }
 */
-resource hub 'Microsoft.MachineLearningServices/workspaces@2024-01-01-preview' existing = {
+resource hub 'Microsoft.MachineLearningServices/workspaces@2024-10-01' existing = {
   name: hubName
 }
 

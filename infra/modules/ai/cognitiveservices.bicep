@@ -39,7 +39,7 @@ param logAnalyticsWorkspaceResourceId string = ''
 @description('Optional. The list of role assignments to be created for the cognitive service account.')
 param roleAssignments roleAssignmentType[]?
 
-module account 'br/public:avm/res/cognitive-services/account:0.9.1' = {
+module account 'br/public:avm/res/cognitive-services/account:0.10.1' = {
   name: name
   params: {
     name: name
@@ -85,5 +85,5 @@ output name string = account.name
 output endpoint string = account.outputs.endpoint
 
 @description('All endpoints available for the cognitive services account, types depends on the cognitive service kind.')
-output endpoints endpointsType = account.outputs.endpoints
+output endpoints endpointsType = account.outputs.?endpoints
 

@@ -1,0 +1,108 @@
+{
+  // See https://aka.ms/bicep/config for more information on Bicep configuration options
+  // Press CTRL+SPACE/CMD+SPACE at any location to see Intellisense suggestions
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "verbose": false,
+      "rules": {
+        "no-hardcoded-env-urls": {
+          "level": "error"
+        },
+        "no-unused-params": {
+          "level": "error"
+        },
+        "no-unused-vars": {
+          "level": "error"
+        },
+        "no-unused-existing-resources": {
+          "level": "error"
+        },
+        "prefer-interpolation": {
+          "level": "error"
+        },
+        "secure-parameter-default": {
+          "level": "error"
+        },
+        "simplify-interpolation": {
+          "level": "error"
+        },
+        "protect-commandtoexecute-secrets": {
+          "level": "error"
+        },
+        "use-stable-resource-identifiers": {
+          "level": "error"
+        },
+        "use-stable-vm-image": {
+          "level": "error"
+        },
+        "max-outputs": {
+          "level": "warning",
+          "maxNumberOfOutputs": 100
+        },
+        "max-params": {
+          "level": "warning",
+          "maxNumberOfParams": 60
+        },
+        "max-resources": {
+          "level": "warning",
+          "maxNumberOfResources": 1000
+        },
+        "max-variables": {
+          "level": "warning",
+          "maxNumberOfVariables": 100
+        },
+        "no-loc-expr-outside-params": {
+          "level": "error"
+        },
+        "no-hardcoded-location": {
+          "level": "error"
+        },
+        "adminusername-should-not-be-literal": {
+          "level": "error"
+        },
+        "no-unnecessary-dependson": {
+          "level": "error"
+        },
+        "outputs-should-not-contain-secrets": {
+          "level": "error"
+        },
+        "use-recent-api-versions": {
+          "level": "warning",
+          "maxAllowedAgeInDays": 365
+        },
+        "use-recent-module-versions": {
+          "level": "warning"
+        },
+        "explicit-values-for-loc-params": {
+          "level": "error"
+        },
+        "no-deployments-resources": {
+          "level": "warning"
+        },
+        "prefer-unquoted-property-names": {
+          "level": "error"
+        },
+        "secure-secrets-in-params": {
+          "level": "error"
+        },
+        "simplify-json-null": {
+          "level": "warning"
+        },
+        "use-parent-property": {
+          "level": "error"
+        },
+        "nested-deployment-template-scoping": {
+          "level": "error"
+        }
+      }
+    }
+  },
+  "formatting": {
+    "newlineKind": "LF",
+    "indentKind": "Space",
+    "indentationSize": 2,
+    "insertFinalNewline": true,
+    "trimFinalNewline": false
+  }
+}

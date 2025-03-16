@@ -4,7 +4,7 @@ param exists bool
 @description('The name of the container app to fetch container information from')
 param name string
 
-resource existingApp 'Microsoft.App/containerApps@2023-04-01-preview' existing = if (exists) {
+resource existingApp 'Microsoft.App/containerApps@2024-10-02-preview' existing = if (exists) {
   name: name
 }
 
