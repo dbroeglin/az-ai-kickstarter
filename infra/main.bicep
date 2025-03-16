@@ -263,7 +263,7 @@ module project 'modules/ai/project.bicep' = {
   }
 }
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
+module storageAccount 'br/public:avm/res/storage/storage-account:0.18.2' = {
   name: 'storageAccount'
   scope: resourceGroup()
   params: {
@@ -349,7 +349,7 @@ module azureOpenAi 'modules/ai/cognitiveservices.bicep' = {
   }
 }
 
-module searchService 'br/public:avm/res/search/search-service:0.8.2' = {
+module searchService 'br/public:avm/res/search/search-service:0.9.2' = {
   name: _aiSearchServiceName
   scope: resourceGroup()
   params: {
@@ -362,7 +362,7 @@ module searchService 'br/public:avm/res/search/search-service:0.8.2' = {
 
 /* ---------------------------- Observability  ------------------------------ */
 
-module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.9.1' = {
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.11.1' = {
   name: 'workspaceDeployment'
   params: {
     name: _logAnalyticsWorkspaceName
@@ -372,7 +372,7 @@ module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0
   }
 }
 
-module appInsightsComponent 'br/public:avm/res/insights/component:0.4.2' = {
+module appInsightsComponent 'br/public:avm/res/insights/component:0.6.0' = {
   name: _applicationInsightsName
   params: {
     name: _applicationInsightsName
@@ -397,7 +397,7 @@ module containerRegistry 'modules/app/container-registry.bicep' = {
   }
 }
 
-module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1' = {
+module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.10.0' = {
   name: 'containerAppsEnvironment'
   params: {
     name: _containerAppsEnvironmentName
@@ -409,7 +409,7 @@ module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1
   }
 }
 
-module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
+module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
   name: 'keyVault'
   scope: resourceGroup()
   params: {
@@ -461,6 +461,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
   scope: resourceGroup()
   params: {
     name: _frontendContainerAppName
+    location: location
     tags: tags
     identityId: frontendIdentity.outputs.resourceId
     containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
@@ -521,6 +522,7 @@ module backendApp 'modules/app/container-apps.bicep' = {
   scope: resourceGroup()
   params: {
     name: _backendContainerAppName
+    location: location
     tags: tags
     identityId: backendIdentity.outputs.resourceId
     containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
