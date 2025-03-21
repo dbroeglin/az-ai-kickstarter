@@ -51,3 +51,8 @@ python -m venv .venv
 . .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
+
+### Use .env files rather than AZD environement
+
+In both `src/backend` and `src/frontend` copy the `sample.env` files into `.env` 
+files and manually fill the variables. Optional fields are documented.
