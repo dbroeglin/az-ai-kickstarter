@@ -80,6 +80,10 @@ def set_up_tracing():
     """
     Sets up exporters for Azure Monitor and optional local telemetry.
     """
+    if not os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+        logging.info("APPLICATIONINSIGHTS_CONNECTION_STRING is not set skipping observability setup.")
+        return
+
     exporters = []
     exporters.append(AzureMonitorTraceExporter.from_connection_string(os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")))
     if (local_endpoint):
@@ -96,6 +100,10 @@ def set_up_metrics():
     Configures metrics collection with OpenTelemetry.
     Configures views to filter metrics to only those starting with "semantic_kernel".
     """
+    if not os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+        logging.info("APPLICATIONINSIGHTS_CONNECTION_STRING is not set skipping observability setup.")
+        return
+
     exporters = []
     if (local_endpoint):
         exporters.append(OTLPMetricExporter(endpoint=local_endpoint))
@@ -120,6 +128,10 @@ def set_up_logging():
     Configures logging with OpenTelemetry.
     Adds filters to exclude specific namespace logs for cleaner output.
     """
+    if not os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+        logging.info("APPLICATIONINSIGHTS_CONNECTION_STRING is not set skipping observability setup.")
+        return
+
     exporters = []
     exporters.append(AzureMonitorLogExporter(connection_string=os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")))
 
