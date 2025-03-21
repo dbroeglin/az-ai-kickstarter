@@ -466,7 +466,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
     exists: frontendExists
     serviceName: 'frontend' // Must match the service name in azure.yaml
     env: {
-      // BACKEND_ENDPOINT: backendApp.outputs.URL
+      // URL of the backend endpoint, for instance: http://localhost:8000
       BACKEND_ENDPOINT: backendApp.outputs.URL
 
       // Required for the frontend app to ask for a token for the backend app
