@@ -62,13 +62,13 @@ param useAuthentication bool = false
 ])
 param aiSearchSkuName string = 'basic'
 
-@description('The auth tenant id for the frontend and backend app (leave blank in AZD to use your current tenant)')
+@description('The auth tenant id for the app (leave blank in AZD to use your current tenant)')
 param authTenantId string = '' // Make sure authTenantId is set if not using AZD
 
 @description('Name of the authentication client secret in the key vault')
 param authClientSecretName string = 'AZURE-AUTH-CLIENT-SECRET'
 
-@description('The auth client id for the frontend and backend app')
+@description('The auth client id for the app')
 param authClientId string = ''
 
 @description('Client secret of the authentication client')
@@ -91,15 +91,6 @@ param frontendContainerAppName string = ''
 
 @description('Set if the frontend container app already exists.')
 param frontendExists bool = false
-
-/* --------------------------------- Backend -------------------------------- */
-
-@maxLength(32)
-@description('Name of the backend container app to deploy. If not specified, a name will be generated. The maximum length is 32 characters.')
-param backendContainerAppName string = ''
-
-@description('Set if the backend container app already exists.')
-param backendExists bool = false
 
 /* -------------------------------------------------------------------------- */
 /*                                  VARIABLES                                 */
@@ -224,10 +215,6 @@ var _frontendIdentityName = take(
 var _frontendContainerAppName = !empty(frontendContainerAppName)
   ? frontendContainerAppName
   : take('${abbreviations.appContainerApps}frontend-${environmentName}', 32)
-var _backendIdentityName = take('${abbreviations.managedIdentityUserAssignedIdentities}backend-${environmentName}', 32)
-var _backendContainerAppName = !empty(backendContainerAppName)
-  ? backendContainerAppName
-  : take('${abbreviations.appContainerApps}backend-${environmentName}', 32)
 
 /* -------------------------------------------------------------------------- */
 /*                                  RESOURCES                                 */
@@ -309,7 +296,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.18.2' = {
           roleAssignments: [
             {
               roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-              principalId: backendIdentity.outputs.principalId
+              principalId: frontendIdentity.outputs.principalId
               principalType: 'ServicePrincipal'
             }
           ]
@@ -340,7 +327,7 @@ module azureOpenAi 'modules/ai/cognitiveservices.bicep' = {
     roleAssignments: [
       {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-        principalId: backendIdentity.outputs.principalId
+        principalId: frontendIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
@@ -392,14 +379,13 @@ module containerRegistry 'modules/app/container-registry.bicep' = {
     location: location
     pullingIdentityNames: [
       _frontendIdentityName
-      _backendIdentityName
     ]
     tags: tags
     name: _containerRegistryName // Changed from using token directly to using the variable
   }
 }
 
-module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.10.0' = {
+module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.10.1' = {
   name: 'containerAppsEnvironment'
   params: {
     name: _containerAppsEnvironmentName
@@ -425,11 +411,6 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
       {
         roleDefinitionIdOrName: 'Key Vault Secrets User'
         principalId: frontendIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalId: backendIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
@@ -472,17 +453,26 @@ module frontendApp 'modules/app/container-apps.bicep' = {
     exists: frontendExists
     serviceName: 'frontend' // Must match the service name in azure.yaml
     env: {
-      // URL of the backend endpoint, for instance: http://localhost:8000
-      BACKEND_ENDPOINT: backendApp.outputs.URL
-
-      // Required for the frontend app to ask for a token for the backend app
-      AZURE_CLIENT_APP_ID: authClientId
-
       // Required for container app daprAI
       APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
+      AZURE_RESOURCE_GROUP: resourceGroup().name
+      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS: true
+      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS_SENSITIVE: true // OBS! You might want to remove this in production
 
       // Required for managed identity
       AZURE_CLIENT_ID: frontendIdentity.outputs.clientId
+
+      // Required for self authentication
+      AZURE_CLIENT_APP_ID: authClientId
+
+      AZURE_OPENAI_API_VERSION: azureOpenAiApiVersion
+      AZURE_OPENAI_ENDPOINT: azureOpenAiApiEndpoint
+      EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME: executorAzureOpenAiDeploymentName
+      UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME: utilityAzureOpenAiDeploymentName
+
+      PLANNER_AZURE_OPENAI_ENDPOINT: plannerAzureOpenAiApiEndpoint
+      PLANNER_AZURE_OPENAI_API_VERSION: plannerAzureOpenAiApiVersion
+      PLANNER_AZURE_OPENAI_DEPLOYMENT_NAME: plannerAzureOpenAiDeploymentName
     }
     keyvaultIdentities: useAuthentication
       ? {
@@ -504,63 +494,13 @@ module frontendContainerAppAuth 'modules/app/container-apps-auth.bicep' = if (us
     openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
     unauthenticatedClientAction: 'RedirectToLoginPage'
     allowedApplications: [
+      frontendIdentity.outputs.clientId
+
       '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
     ]
-  }
-}
-
-/* ------------------------------ Backend App ------------------------------- */
-
-module backendIdentity './modules/app/identity.bicep' = {
-  name: 'backendIdentity'
-  scope: resourceGroup()
-  params: {
-    location: location
-    identityName: _backendIdentityName
-  }
-}
-
-module backendApp 'modules/app/container-apps.bicep' = {
-  name: 'backend-container-app'
-  scope: resourceGroup()
-  params: {
-    name: _backendContainerAppName
-    location: location
-    tags: tags
-    identityId: backendIdentity.outputs.resourceId
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
-    containerRegistryName: containerRegistry.outputs.name
-    exists: backendExists
-    serviceName: 'backend' // Must match the service name in azure.yaml
-    externalIngressAllowed: true // Set to true if you intend to call backend from the locallly deployed frontend
-    // Setting to true will allow traffic from anywhere
-    env: {
-      // Required for container app daprAI
-      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
-      AZURE_RESOURCE_GROUP: resourceGroup().name
-      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS: true
-      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS_SENSITIVE: true // OBS! You might want to remove this in production
-
-      // Required for managed identity
-      AZURE_CLIENT_ID: backendIdentity.outputs.clientId
-
-      AZURE_OPENAI_API_VERSION: azureOpenAiApiVersion
-      AZURE_OPENAI_ENDPOINT: azureOpenAiApiEndpoint
-      EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME: executorAzureOpenAiDeploymentName
-      UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME: utilityAzureOpenAiDeploymentName
-
-      PLANNER_AZURE_OPENAI_ENDPOINT: plannerAzureOpenAiApiEndpoint
-      PLANNER_AZURE_OPENAI_API_VERSION: plannerAzureOpenAiApiVersion
-      PLANNER_AZURE_OPENAI_DEPLOYMENT_NAME: plannerAzureOpenAiDeploymentName
-    }
-    secrets: union(
-      {},
-      empty(plannerKeyParam)
-        ? {}
-        : {
-            plannerkeysecret: plannerKeyParam
-          }
-    )
+    allowedAudiences: [
+      'api://${authClientId}'
+    ]
   }
 }
 
@@ -571,7 +511,7 @@ module backendApp 'modules/app/container-apps.bicep' = {
 // These outputs are automatically saved in the local azd environment .env file.
 // To see these outputs, run `azd env get-values` or
 // `azd env get-values --output json` for json output.
-// To generate your own `.env` file run `azd env get-values > .env`
+// To generate your own `.env` file run `azd env get-values > .env` 
 
 /* --------------------------- Infrastructure Resources --------------------- */
 
@@ -591,9 +531,6 @@ output APPLICATIONINSIGHTS_CONNECTION_STRING string = appInsightsComponent.outpu
 
 @description('Endpoint URL of the Frontend service - This is the main application URL for end users')
 output SERVICE_FRONTEND_URL string = frontendApp.outputs.URL
-
-@description('Endpoint URL of the Backend service - Used by the frontend to make API calls')
-output SERVICE_BACKEND_URL string = backendApp.outputs.URL
 
 /* ------------------------ Authentication & RBAC -------------------------- */
 

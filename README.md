@@ -67,7 +67,7 @@ azd up
 
 #### Deploy with authentication enabled
 
-AZD can automatically configure authentication to secure the frontend and/or backend. To do so execute the following command before `azd up`:
+AZD can automatically configure authentication to secure the frontend application. To do so execute the following command before `azd up`:
 ```bash
 azd env set USE_AUTHENTICATION true
 ```
@@ -97,19 +97,12 @@ export aoaikeysecret="key"
 
 ## How it works
 
-### Running the frontend 
-
-```bash
-cd src/frontend
-uv sync
-uv run streamlit app.py
-```
-### Running the backend
+### Running the frontend application
 
   ```bash
   # Sync Python dependencies
   uv sync
-  # Start the backend server with live reloading
+  # Start the frontend server with live reloading
   uv run uvicorn app:app --reload
   ```
 
@@ -129,11 +122,6 @@ stream the logs to your local terminal.
 For the Frontend:
 ```bash
 ./scripts/aca_logs.sh frontend
-```
-
-For the Backend:
-```bash
-./scripts/aca_logs.sh backend
 ```
 
 Logs will be streamed to your terminal:

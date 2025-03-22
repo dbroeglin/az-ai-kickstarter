@@ -1,120 +1,87 @@
 """
-Streamlit frontend application for AI blog post generation.
+FastAPI backend application for blog post generation using AI debate orchestration.
 
-This script provides a web interface using Streamlit that communicates with a backend service
-to generate blog posts on specified topics.
+This module initializes a FastAPI application that exposes endpoints for generating
+blog posts using a debate pattern orchestrator, with appropriate logging, tracing,
+and metrics configurations.
 """
-import base64
-import json
 import logging
 import os
-import requests
-import streamlit as st
-from dotenv import load_dotenv
-from io import StringIO
-from subprocess import run, PIPE
+from fastapi import FastAPI, Body
+from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from patterns.debate import DebateOrchestrator
+from utils.util import load_dotenv_from_azd, set_up_tracing, set_up_metrics, set_up_logging
+from chainlit.utils import mount_chainlit
+import chainlit as cl
+import pathlib
 
-def load_dotenv_from_azd():
-    """
-    Load environment variables from Azure Developer CLI (azd) or fallback to .env file.
-    
-    Attempts to retrieve environment variables using the 'azd env get-values' command.
-    If unsuccessful, falls back to loading from a .env file.
-    """
-    result = run("azd env get-values", stdout=PIPE, stderr=PIPE, shell=True, text=True)
-    if result.returncode == 0:
-        logging.info(f"Found AZD environment. Loading...")
-        load_dotenv(stream=StringIO(result.stdout))
-    else:
-        logging.info(f"AZD environment not found. Trying to load from .env file...")
-        load_dotenv()
+load_dotenv_from_azd()
+set_up_tracing()
+set_up_metrics()
+set_up_logging()
 
-def get_principal_id():
-    """
-    Retrieve the current user's principal ID from request headers.
-    If the application is running in Azure Container Apps, and is configured for authentication, 
-    the principal ID is extracted from the 'x-ms-client-principal-id' header.
-    If the header is not present, a default user ID is returned.
-    
-    Returns:
-        str: The user's principal ID if available, otherwise 'default_user_id'
-    """
-    result = st.context.headers.get('x-ms-client-principal-id')
-    logging.info(f"Retrieved principal ID: {result if result else 'default_user_id'}")
-    return result if result else "default_user_id"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:   %(name)s   %(message)s',
+)
+logger = logging.getLogger(__name__)
+logging.getLogger('azure.core.pipeline.policies.http_logging_policy').setLevel(logging.WARNING)
+logging.getLogger('azure.monitor.opentelemetry.exporter.export').setLevel(logging.WARNING)
 
-def get_principal_display_name():
-    """
-    Get the display name of the current user from the request headers.
-    
-    Extracts user information from the 'x-ms-client-principal' header used in 
-    Azure Container Apps authentication.
-    
-    Returns:
-        str: The user's display name if available, otherwise 'Default User'
-        
-    See https://learn.microsoft.com/en-us/azure/container-apps/authentication#access-user-claims-in-application-code for more information.
-    """
-    default_user_name = "Default User"
-    principal = st.context.headers.get('x-ms-client-principal')
-    if principal:
-        principal = json.loads(base64.b64decode(principal).decode('utf-8'))
-        claims = principal.get("claims", [])
-        return next((claim["val"] for claim in claims if claim["typ"] == "name"), default_user_name)
-    else:
-        return default_user_name
+# Choose pattern to use
+orchestrator = DebateOrchestrator()
 
-def is_valid_json(json_string): 
+app = FastAPI()
+
+logger.info("Diagnostics: %s", os.getenv('SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS'))
+
+# Mount the static directory to serve static files
+app.mount("/assets", StaticFiles(directory=str(pathlib.Path(__file__).parent / "assets")), name="static")
+
+# Mount the Chainlit UI at the /ui path
+mount_chainlit(app=app, target="ui.py", path="/ui")
+
+@app.post("/blog")
+async def http_blog(request_body: dict = Body(...)):
     """
-    Validate if a string is properly formatted JSON.
+    Generate a blog post about a specified topic using the debate orchestrator.
     
     Args:
-        json_string (str): The string to validate as JSON
-        
+        request_body (dict): JSON body containing 'topic' and 'user_id' fields.
+            - topic (str): The subject for the blog post. Defaults to 'Starwars'.
+            - user_id (str): Identifier for the user making the request. Defaults to 'default_user'.
+    
     Returns:
-        bool: True if string is valid JSON, False otherwise
+        StreamingResponse: A streaming response.
+        Chunk can be be either a string or contain JSON. 
+        If the chunk is a string it is a status update. 
+        JSON will contain the generated blog post content.
     """
-    try: 
-        json.loads(json_string) 
-        return True 
-    except json.JSONDecodeError: 
-        return False
+    logger.info('API request received with body %s', request_body)
 
-# Initialize environment
-load_dotenv_from_azd()
+    topic = request_body.get('topic', 'Starwars')
+    user_id = request_body.get('user_id', 'default_user')
+    content = f"Write a blog post about {topic}."
 
-# Setup sidebar with user information and logout link
-st.sidebar.write(f"Welcome, {get_principal_display_name()}!")
-st.sidebar.markdown(
-    '<a href="/.auth/logout" target = "_self">Sign Out</a>', unsafe_allow_html=True
-)
+    conversation_messages = []
+    conversation_messages.append({'role': 'user', 'name': 'user', 'content': content})
 
-# Main content area - blog post generation
-st.write("Requesting a blog post about cookies:")
-result = None
-with st.status("Agents are crafting a response...", expanded=True) as status:
-    try:
-        # Call backend API to generate blog post
-        url = f'{os.getenv("BACKEND_ENDPOINT", "http://localhost:8000")}/blog'
-        payload = {"topic": "cookies", "user_id": get_principal_id()}
-        headers = {}
+    async def doit():
+        """
+        Asynchronous generator that streams debate orchestrator responses.
         
-        # Processing treaming responses
-        # Each chunk can be be either a string or contain JSON. 
-        # If the chunk is a string it is a status action update - "Critic evaluates the text". 
-        # If it is a JSON it will contain the generated blog post content.
-        with requests.post(url, json=payload, headers={}, stream=True) as response:
-            for line in response.iter_lines():
-                result = line.decode('utf-8')
-                # For each line as JSON
-                # result = json.loads(line.decode('utf-8'))
-                if not is_valid_json(result):
-                   status.write(result)  
-                   
-        status.update(label="Backend call complete", state="complete", expanded=False)
-    except Exception as e:
-        status.update(
-            label=f"Backend call failed: {e}", state="complete", expanded=False
-        )
-        
-st.markdown(json.loads(result)["content"])
+        Yields:
+            str: Chunks of the generated blog post content with newline characters appended.
+        """
+        async for i in orchestrator.process_conversation(user_id, conversation_messages):
+            yield i + '\n'
+
+    return StreamingResponse(doit(), media_type="application/json")
+
+@app.get("/")
+async def root():
+    """
+    Root endpoint that HTTP redirects to the Chainlit UI.
+    """
+    return RedirectResponse(url="/ui")

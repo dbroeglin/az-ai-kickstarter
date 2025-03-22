@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 import urllib
 
 import aiohttp
 import chainlit as cl
+from azure.identity import DefaultAzureCredential
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +30,23 @@ async def set_starters():
 
 @cl.on_message
 async def main(message: cl.Message):
+    headers = {}
     topic = message.content.strip()
     msg = cl.Message(content=f"**Generating blog post about {topic}:**\n")
 
+    app_id = os.getenv("AZURE_CLIENT_APP_ID")
+    if app_id:
+        token = DefaultAzureCredential().get_token(f'api://{app_id}/.default')
+        headers = {
+            "Authorization": f"Bearer {token.token}",
+        }
     async with aiohttp.ClientSession() as session:
         try:
             url = urllib.parse.urlparse(message.metadata["location"])
             async with session.post(
                 url._replace(path="/blog").geturl(),
                 json={"topic": topic, "user_id": message.author},
+                headers=headers,
             ) as response:
                 response.raise_for_status()  # Raise an error for bad responses
 
