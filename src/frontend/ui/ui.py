@@ -32,7 +32,7 @@ async def set_starters():
 async def main(message: cl.Message):
     headers = {}
     topic = message.content.strip()
-    msg = cl.Message(content=f"**Generating blog post about {topic}:**\n")
+    msg = cl.Message(content=f"**Generating blog post with topic: {topic}:**\n")
 
     app_id = os.getenv("AZURE_CLIENT_APP_ID")
     if app_id:
@@ -53,7 +53,7 @@ async def main(message: cl.Message):
                 async for chunk in response.content.iter_any():
                     chunk_text = chunk.decode("utf-8").strip()
                     if not chunk_text.startswith("{"):
-                        await msg.stream_token("\n* " + chunk_text)
+                        await msg.stream_token(f"* {chunk_text}\n" )
                 await msg.update()
 
                 blog_data = json.loads(chunk).get("content", "")
