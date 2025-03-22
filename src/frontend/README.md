@@ -14,3 +14,11 @@ uv run uvicorn app:app --reload
 > [INFO!] Environment variables will be read from the AZD env file: `$project/.azure/<selected_azd_environment>/.env` automatically
 
 > [WARNING!] Planner environment variables are incompaible with o1-prevew or o1-mini models
+
+## Testing the blog endpoint
+
+```shell
+curl "http://localhost:8000/blog" \
+    -H "Content-Type: application/json" \
+    -d '{ "topic": "cookies"}'
+```
