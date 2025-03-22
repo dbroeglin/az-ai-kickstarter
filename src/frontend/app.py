@@ -37,10 +37,10 @@ app = FastAPI()
 logger.info("Diagnostics: %s", os.getenv('SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS'))
 
 # Mount the static directory to serve static files
-app.mount("/assets", StaticFiles(directory=str(pathlib.Path(__file__).parent / "assets")), name="static")
+app.mount("/assets", StaticFiles(directory=str(pathlib.Path(__file__).parent / "ui" / "assets")), name="assets")
 
 # Mount the Chainlit UI at the /ui path
-mount_chainlit(app=app, target="ui.py", path="/ui")
+mount_chainlit(app=app, target="ui/ui.py", path="/ui")
 
 @app.post("/blog")
 async def http_blog(request_body: dict = Body(...)):
@@ -74,10 +74,10 @@ async def http_blog(request_body: dict = Body(...)):
         Yields:
             str: Chunks of the generated blog post content with newline characters appended.
         """
-        async for i in orchestrator.process_conversation(user_id, conversation_messages):
-            yield i + '\n'
+        async for chunk in orchestrator.process_conversation(user_id, conversation_messages):
+            yield f"{chunk}\n"
 
-    return StreamingResponse(doit(), media_type="application/json")
+    return StreamingResponse(doit(), media_type="text/event-stream")
 
 @app.get("/")
 async def root():
