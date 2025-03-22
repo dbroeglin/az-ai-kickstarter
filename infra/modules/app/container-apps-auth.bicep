@@ -42,6 +42,7 @@ resource auth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
     globalValidation: {
       redirectToProvider: 'azureactivedirectory'
       unauthenticatedClientAction: unauthenticatedClientAction
+      
     }
     identityProviders: {
       azureActiveDirectory: {

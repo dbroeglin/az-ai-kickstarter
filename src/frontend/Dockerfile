@@ -30,14 +30,16 @@ RUN uv sync \
     --no-editable \
     --all-packages
 
-COPY app.py /app/
+COPY *.py /app/
+COPY agents /app/agents
+COPY patterns /app/patterns
+COPY utils /app/utils
 
 ###############
 # Final image #
 ###############
 
 FROM base
-STOPSIGNAL SIGINT
 
 RUN groupadd -r app
 RUN useradd -r -d /app -g app -N app
@@ -46,4 +48,4 @@ COPY --from=builder --chown=app:app /app /app
 WORKDIR /app
 
 EXPOSE 8000
-ENTRYPOINT ["/app/.venv/bin/streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]
+ENTRYPOINT ["/app/.venv/bin/uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

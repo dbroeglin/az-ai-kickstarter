@@ -19,7 +19,7 @@ consider:
 - [Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-overview)
 - [Azure Kubernetes Service](https://learn.microsoft.com/en-us/azure/aks/what-is-aks)
 - [Azure Static Web Apps](https://learn.microsoft.com/en-us/azure/static-web-apps/overview) static
-  single page applciation with Azure functions as backends
+  single page application with Azure functions as backends
 
 Options not considered in the discussion below:
 - [Azure RedHat
