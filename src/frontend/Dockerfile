@@ -32,7 +32,7 @@ RUN uv sync \
 
 COPY *.py /app/
 COPY ui /app/ui
-COPY ui/.chainlit/ /app/ui/.chainlit/
+COPY ui/.chainlit/** /app/ui/.chainlit/
 COPY agents /app/agents
 COPY patterns /app/patterns
 COPY utils /app/utils

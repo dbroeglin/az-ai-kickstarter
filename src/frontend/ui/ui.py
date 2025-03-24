@@ -32,7 +32,7 @@ async def set_starters():
 async def main(message: cl.Message):
     headers = {}
     topic = message.content.strip()
-    msg = cl.Message(content=f"**Generating blog post with topic: {topic}:**\n")
+    msg = cl.Message(content=f"**Generating blog post with topic '{topic}':**\n")
 
     app_id = os.getenv("AZURE_CLIENT_APP_ID")
     if app_id:
