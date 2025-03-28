@@ -208,8 +208,8 @@ var _containerAppsEnvironmentName = !empty(containerAppsEnvironmentName)
 /* ----------------------------- Resource Names ----------------------------- */
 
 // These resources only require uniqueness within resource group
-var _frontendIdentityName = take(
-  '${abbreviations.managedIdentityUserAssignedIdentities}frontend-${environmentName}',
+var _appIdentityName = take(
+  '${abbreviations.managedIdentityUserAssignedIdentities}app-${environmentName}',
   32
 )
 var _frontendContainerAppName = !empty(frontendContainerAppName)
@@ -296,7 +296,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.18.2' = {
           roleAssignments: [
             {
               roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-              principalId: frontendIdentity.outputs.principalId
+              principalId: appIdentity.outputs.principalId
               principalType: 'ServicePrincipal'
             }
           ]
@@ -327,7 +327,7 @@ module azureOpenAi 'modules/ai/cognitiveservices.bicep' = {
     roleAssignments: [
       {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-        principalId: frontendIdentity.outputs.principalId
+        principalId: appIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
@@ -378,7 +378,7 @@ module containerRegistry 'modules/app/container-registry.bicep' = {
   params: {
     location: location
     pullingIdentityNames: [
-      _frontendIdentityName
+      _appIdentityName
     ]
     tags: tags
     name: _containerRegistryName // Changed from using token directly to using the variable
@@ -410,7 +410,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
     roleAssignments: [
       {
         roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalId: frontendIdentity.outputs.principalId
+        principalId: appIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
@@ -429,16 +429,17 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
   }
 }
 
-/* ------------------------------ Frontend App ------------------------------ */
 
-module frontendIdentity './modules/app/identity.bicep' = {
-  name: 'frontendIdentity'
+module appIdentity './modules/app/identity.bicep' = {
+  name: 'appIdentity'
   scope: resourceGroup()
   params: {
     location: location
-    identityName: _frontendIdentityName
+    identityName: _appIdentityName
   }
 }
+
+/* ------------------------------ Frontend App ------------------------------ */
 
 module frontendApp 'modules/app/container-apps.bicep' = {
   name: 'frontend-container-app'
@@ -447,7 +448,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
     name: _frontendContainerAppName
     location: location
     tags: tags
-    identityId: frontendIdentity.outputs.resourceId
+    identityId: appIdentity.outputs.resourceId
     containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
     containerRegistryName: containerRegistry.outputs.name
     exists: frontendExists
@@ -460,7 +461,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
       SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS_SENSITIVE: true // OBS! You might want to remove this in production
 
       // Required for managed identity
-      AZURE_CLIENT_ID: frontendIdentity.outputs.clientId
+      AZURE_CLIENT_ID: appIdentity.outputs.clientId
 
       // Required for self authentication
       AZURE_CLIENT_APP_ID: authClientId
@@ -478,7 +479,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
       ? {
           'microsoft-provider-authentication-secret': {
             keyVaultUrl: '${keyVault.outputs.uri}secrets/${authClientSecretName}'
-            identity: frontendIdentity.outputs.resourceId
+            identity: appIdentity.outputs.resourceId
           }
         }
       : {}
@@ -494,7 +495,7 @@ module frontendContainerAppAuth 'modules/app/container-apps-auth.bicep' = if (us
     openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
     unauthenticatedClientAction: 'RedirectToLoginPage'
     allowedApplications: [
-      frontendIdentity.outputs.clientId
+      appIdentity.outputs.clientId
 
       '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
     ]
