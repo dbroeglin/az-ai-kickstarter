@@ -213,8 +213,9 @@ var _containerAppsEnvironmentName = !empty(containerAppsEnvironmentName)
 
 /* ----------------------------- Resource Names ----------------------------- */
 
-var _frontendIdentityName = take(
-  '${abbreviations.managedIdentityUserAssignedIdentities}frontend-${environmentName}',
+// These resources only require uniqueness within resource group
+var _appIdentityName = take(
+  '${abbreviations.managedIdentityUserAssignedIdentities}app-${environmentName}',
   32
 )
 var _frontendContainerAppName = !empty(frontendContainerAppName)
@@ -305,7 +306,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
           roleAssignments: [
             {
               roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-              principalId: backendIdentity.outputs.principalId
+              principalId: appIdentity.outputs.principalId
               principalType: 'ServicePrincipal'
             }
           ]
@@ -336,7 +337,7 @@ module azureOpenAi 'modules/ai/cognitiveservices.bicep' = {
     roleAssignments: [
       {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-        principalId: backendIdentity.outputs.principalId
+        principalId: appIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
@@ -389,8 +390,7 @@ module containerRegistry 'modules/app/container-registry.bicep' = {
   params: {
     location: location
     pullingIdentityNames: [
-      _frontendIdentityName
-      _backendIdentityName
+      _appIdentityName
     ]
     tags: tags
     name: '${abbreviations.containerRegistryRegistries}${resourceToken}'
@@ -421,7 +421,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
     roleAssignments: [
       {
         roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalId: frontendIdentity.outputs.principalId
+        principalId: appIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
@@ -445,16 +445,17 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
   }
 }
 
-/* ------------------------------ Frontend App ------------------------------ */
 
-module frontendIdentity './modules/app/identity.bicep' = {
-  name: 'frontendIdentity'
+module appIdentity './modules/app/identity.bicep' = {
+  name: 'appIdentity'
   scope: resourceGroup()
   params: {
     location: location
-    identityName: _frontendIdentityName
+    identityName: _appIdentityName
   }
 }
+
+/* ------------------------------ Frontend App ------------------------------ */
 
 module frontendApp 'modules/app/container-apps.bicep' = {
   name: 'frontend-container-app'
@@ -462,7 +463,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
   params: {
     name: _frontendContainerAppName
     tags: tags
-    identityId: frontendIdentity.outputs.resourceId
+    identityId: appIdentity.outputs.resourceId
     containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
     containerRegistryName: containerRegistry.outputs.name
     exists: frontendExists
@@ -478,13 +479,13 @@ module frontendApp 'modules/app/container-apps.bicep' = {
       APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
 
       // Required for managed identity
-      AZURE_CLIENT_ID: frontendIdentity.outputs.clientId
+      AZURE_CLIENT_ID: appIdentity.outputs.clientId
     }
     keyvaultIdentities: useAuthentication
       ? {
           'microsoft-provider-authentication-secret': {
             keyVaultUrl: '${keyVault.outputs.uri}secrets/${authClientSecretName}'
-            identity: frontendIdentity.outputs.resourceId
+            identity: appIdentity.outputs.resourceId
           }
         }
       : {}
