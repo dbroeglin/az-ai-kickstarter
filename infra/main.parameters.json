@@ -26,17 +26,23 @@
     "azurePrincipalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
     },
-    "plannerEndpointParam": {
-      "value": "${PLANNER_AZURE_OPENAI_ENDPOINT}"
+    "azureOpenAiEndpoint": {
+      "value": "${AZURE_OPENAI_ENDPOINT}"
     },
-    "plannerDeploymentNameParam": {
-      "value": "${PLANNER_AZURE_OPENAI_DEPLOYMENT_NAME}"
+    "azureOpenAiApiVersion": {
+      "value": "${AZURE_OPENAI_API_VERSION}"
     },
-    "plannerKeyParam": {
-      "value": "${plannerkeysecret}"
+    "executorAzureOpenAiDeploymentName": {
+      "value": "${EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME}"
     },
-    "plannerApiVersionParam": {
-      "value": "${PLANNER_AZURE_OPENAI_API_VERSION}"
+    "utilityAzureOpenAiDeploymentName": {
+      "value": "${UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME}"
+    },    
+    "aiSearchServiceName": {
+      "value": "${AZURE_AI_SEARCH_SERVICE_NAME}"
+    },
+    "aiSearchResourceGroupName": {
+      "value": "${AZURE_AI_SEARCH_RESOURCE_GROUP_NAME}"
     }
   }
 }
