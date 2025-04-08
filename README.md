@@ -81,20 +81,6 @@ azd provision
 > [!WARNING] 
 > The account executing `azd` needs to be able to create Application Registrations in your Azure Entra ID tenant.
 
-#### External Model
-
-If you have an external Azure OpenAI model already provisioned, you can reference it by setting environment variable prior callin `azd up`
-
-```sh
-export AOAI_ENDPOINT="https://<endpoint>.openai.azure.com"
-export AOAI_DEPLOYMENT_NAME="gpt-4o-2024-11-20"
-export AOAI_API_VERSION="2024-12-01-preview"
-export aoaikeysecret="key"
-```
-
->[WARNING!] The `aoaikeysecret` is not set in azd .azure/<env>./.env file automatically.
-> In order to use it when running the model locally, either set it as env variable or add it to azd `.env` file.
-
 ## How it works
 
 ### Running the frontend 
@@ -138,6 +124,30 @@ For the Backend:
 
 Logs will be streamed to your terminal:
 <img src="doc/images/logging.png" alt="Semantic Kernel Logs" width="800">
+
+## Reusing existing resources
+
+### Reusing AI Services
+
+```bash
+azd env new {Your environment name}
+azd env set AZURE_LOCATION {Your Azure Region. For instance: swedencentral}
+azd env set AZURE_OPENAI_ENDPOINT {Name of existing OpenAI service}
+azd env set AZURE_OPENAI_API_VERSION {API Version of existing OpenAI service}
+azd env set EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME {Deployment name of existing OpenAI service}
+azd env set UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME {Deployment name of existing OpenAI service}
+```
+
+Note that `EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME` and `UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME`can be identical.
+
+### Reusing AI Search
+
+```bash
+azd env set AZURE_SEARCH_SERVICE_NAME {Existing AI Search Service Name}
+
+# If your Azure AI Search Service is in another resource group:
+azd env set AZURE_SEARCH_SERVICE_RESOURCE_GROUP_NAME {Resource group of existing AI Search Service}
+```
 
 ## Code of Conduct
 
