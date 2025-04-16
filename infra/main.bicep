@@ -190,7 +190,6 @@ var _appIdentityName = take('${abbreviations.managedIdentityUserAssignedIdentiti
 var _frontendContainerAppName = !empty(frontendContainerAppName)
   ? frontendContainerAppName
   : take('${abbreviations.appContainerApps}frontend-${environmentName}', 32)
-var _backendIdentityName = take('${abbreviations.managedIdentityUserAssignedIdentities}backend-${environmentName}', 32)
 var _backendContainerAppName = !empty(backendContainerAppName)
   ? backendContainerAppName
   : take('${abbreviations.appContainerApps}backend-${environmentName}', 32)
@@ -393,14 +392,14 @@ module appIdentity './modules/app/identity.bicep' = {
   }
 }
 
-module containerRegistry 'br/public:avm/res/container-registry/registry:0.9.1' {
+module containerRegistry 'br/public:avm/res/container-registry/registry:0.9.1' = {
   name: '${deployment().name}-containerRegistry'
   params: {
     name: _containerRegistryName
     location: location
     tags: tags
-    sku: 'Standard'
-    adminUserEnabled: true
+    acrSku: 'Standard'
+    acrAdminUserEnabled: true
     roleAssignments: [
       {
         roleDefinitionIdOrName: 'AcrPull'
@@ -415,7 +414,7 @@ module containerRegistry 'br/public:avm/res/container-registry/registry:0.9.1' {
   }
 }
 
-module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1' = {
+module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.10.2' = {
   name: '${deployment().name}-containerAppsEnvironment'
   params: {
     name: _containerAppsEnvironmentName
@@ -427,7 +426,7 @@ module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1
   }
 }
 
-module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
+module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
   name: '${deployment().name}-keyVault'
   scope: resourceGroup()
   params: {
