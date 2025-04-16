@@ -26,7 +26,7 @@ param extraTags object = {}
 param useAuthentication bool = false
 
 @description('Deploy Azure AI Search if true. Defaults to false.')
-param useAiSearch bool = false
+param useAiSearchService bool = false
 
 /* ----------- Optional externally provided model configuration ------------ */
 
@@ -202,7 +202,7 @@ var _backendContainerAppName = !empty(backendContainerAppName)
 /* -------------------------------- AI Infra  ------------------------------- */
 
 module hub 'modules/ai/hub.bicep' = {
-  name: 'ai-hub'
+  name: '${deployment().name}-aiHub'
   params: {
     location: location
     tags: tags
@@ -215,14 +215,14 @@ module hub 'modules/ai/hub.bicep' = {
     openAiName: aiServices.outputs.name
     openAiConnectionName: 'aoai-connection'
 
-    aiSearchName: useAiSearch ? searchService.outputs.name : ''
-    aiSearchResourceGroupName: useAiSearch ? aiSearchResourceGroupName : ''
+    aiSearchName: useAiSearchService ? searchService.outputs.name : ''
+    aiSearchResourceGroupName: useAiSearchService ? aiSearchResourceGroupName : ''
     aiSearchConnectionName: 'search-service-connection'
   }
 }
 
 module project 'modules/ai/project.bicep' = {
-  name: 'ai-project'
+  name: '${deployment().name}-aiProject'
   params: {
     location: location
     tags: tags
@@ -232,8 +232,8 @@ module project 'modules/ai/project.bicep' = {
   }
 }
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
-  name: 'storageAccount'
+module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
+  name: '${deployment().name}-storageAccount'
   scope: resourceGroup()
   params: {
     location: location
@@ -300,16 +300,40 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
   }
 }
 
-module aiServices 'modules/ai/cognitiveservices.bicep' = if (empty(azureOpenAiEndpoint)) {
-  name: 'cognitiveServices'
+module aiServices 'br/public:avm/res/cognitive-services/account:0.10.2' = {
+  name: '${deployment().name}-aiServices'
   params: {
+    name: _azureOpenAiName
     location: location
     tags: tags
-    name: _azureOpenAiName
     kind: 'AIServices'
     customSubDomainName: _azureOpenAiName
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+    }
+    disableLocalAuth: false
+    sku: 'S0'
     deployments: deployments
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+    diagnosticSettings: [
+      {
+        name: 'customSetting'
+        logCategoriesAndGroups: [
+          {
+            category: 'RequestResponse'
+          }
+        {
+            category: 'Audit'
+          }
+        ]
+        metricCategories: [
+          {
+            category: 'AllMetrics'
+          }
+        ]
+        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+      }
+    ]
     roleAssignments: [
       {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
@@ -325,12 +349,12 @@ module aiServices 'modules/ai/cognitiveservices.bicep' = if (empty(azureOpenAiEn
 }
 
 module searchService 'br/public:avm/res/search/search-service:0.9.2' = if (empty(aiSearchServiceName)) {
-  name: 'aiSearchService'
+  name: '${deployment().name}-aiSearchService'
   scope: resourceGroup()
   params: {
+    name: _aiSearchServiceName
     location: location
     tags: tags
-    name: _aiSearchServiceName
     sku: aiSearchSkuName
     partitionCount: 1
     replicaCount: 1
@@ -339,8 +363,8 @@ module searchService 'br/public:avm/res/search/search-service:0.9.2' = if (empty
 
 /* ---------------------------- Observability  ------------------------------ */
 
-module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.9.1' = {
-  name: 'workspaceDeployment'
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.11.1' = {
+  name: '${deployment().name}-workspaceDeployment'
   params: {
     name: _logAnalyticsWorkspaceName
     location: location
@@ -350,7 +374,7 @@ module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0
 }
 
 module appInsightsComponent 'br/public:avm/res/insights/component:0.6.0' = {
-  name: 'applicationInsights'
+  name: '${deployment().name}-applicationInsights'
   params: {
     name: _applicationInsightsName
     location: appInsightsLocation
@@ -360,21 +384,39 @@ module appInsightsComponent 'br/public:avm/res/insights/component:0.6.0' = {
 
 /* ------------------------ Common App Resources  -------------------------- */
 
-module containerRegistry 'modules/app/container-registry.bicep' = {
-  name: 'containerRegistry'
+module appIdentity './modules/app/identity.bicep' = {
+  name: '${deployment().name}-appIdentity'
   scope: resourceGroup()
   params: {
     location: location
-    pullingIdentityNames: [
-      _appIdentityName
-    ]
-    tags: tags
+    identityName: _appIdentityName
+  }
+}
+
+module containerRegistry 'br/public:avm/res/container-registry/registry:0.9.1' {
+  name: '${deployment().name}-containerRegistry'
+  params: {
     name: _containerRegistryName
+    location: location
+    tags: tags
+    sku: 'Standard'
+    adminUserEnabled: true
+    roleAssignments: [
+      {
+        roleDefinitionIdOrName: 'AcrPull'
+        principalId: appIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        roleDefinitionIdOrName: 'AcrPull'
+        principalId: azurePrincipalId
+      }
+    ]
   }
 }
 
 module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1' = {
-  name: 'containerAppsEnvironment'
+  name: '${deployment().name}-containerAppsEnvironment'
   params: {
     name: _containerAppsEnvironmentName
     location: location
@@ -386,7 +428,7 @@ module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1
 }
 
 module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
-  name: 'keyVault'
+  name: '${deployment().name}-keyVault'
   scope: resourceGroup()
   params: {
     location: location
@@ -401,13 +443,8 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
         principalType: 'ServicePrincipal'
       }
       {
-        roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalId: backendIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        principalId: azurePrincipalId
         roleDefinitionIdOrName: 'Key Vault Administrator'
+        principalId: azurePrincipalId
       }
     ]
     secrets: useAuthentication && authClientSecret != ''
@@ -421,19 +458,10 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
   }
 }
 
-module appIdentity './modules/app/identity.bicep' = {
-  name: 'appIdentity'
-  scope: resourceGroup()
-  params: {
-    location: location
-    identityName: _appIdentityName
-  }
-}
-
 /* ------------------------------ Frontend App ------------------------------ */
 
 module frontendApp 'modules/app/container-apps.bicep' = {
-  name: 'frontend-container-app'
+  name: '${deployment().name}-frontendContainerApp'
   scope: resourceGroup()
   params: {
     name: _frontendContainerAppName
@@ -468,7 +496,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
 }
 
 module frontendContainerAppAuth 'modules/app/container-apps-auth.bicep' = if (useAuthentication) {
-  name: 'frontend-container-app-auth-module'
+  name: '${deployment().name}-frontendContainerAppAuthModule'
   params: {
     name: frontendApp.outputs.name
     clientId: authClientId
@@ -483,22 +511,13 @@ module frontendContainerAppAuth 'modules/app/container-apps-auth.bicep' = if (us
 
 /* ------------------------------ Backend App ------------------------------- */
 
-module backendIdentity './modules/app/identity.bicep' = {
-  name: 'backendIdentity'
-  scope: resourceGroup()
-  params: {
-    location: location
-    identityName: _backendIdentityName
-  }
-}
-
 module backendApp 'modules/app/container-apps.bicep' = {
-  name: 'backend-container-app'
+  name: '${deployment().name}-backendContainerApp'
   scope: resourceGroup()
   params: {
     name: _backendContainerAppName
     tags: tags
-    identityId: backendIdentity.outputs.resourceId
+    identityId: appIdentity.outputs.resourceId
     containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
     containerRegistryName: containerRegistry.outputs.name
     exists: backendExists
@@ -513,7 +532,7 @@ module backendApp 'modules/app/container-apps.bicep' = {
       SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS_SENSITIVE: true // OBS! You might want to remove this in production
 
       // Required for managed identity
-      AZURE_CLIENT_ID: backendIdentity.outputs.clientId
+      AZURE_CLIENT_ID: appIdentity.outputs.clientId
 
       AZURE_OPENAI_API_VERSION: azureOpenAiApiVersion
       AZURE_OPENAI_ENDPOINT: _azureOpenAiEndpoint
@@ -533,6 +552,12 @@ module backendApp 'modules/app/container-apps.bicep' = {
 // `azd env get-values --output json` for json output.
 // To generate your own `.env` file run `azd env get-values > .env`
 
+@description('Activate authentication if true')
+output USE_AI_SEARCH bool = useAiSearchService
+
+@description('Activate authentication if true')
+output USE_AUTHENTICATION bool = useAuthentication
+
 /* --------------------------- Apps Deployment ----------------------------- */
 
 @description('The endpoint of the container registry.') // necessary for azd deploy
@@ -545,9 +570,6 @@ output SERVICE_FRONTEND_URL string = frontendApp.outputs.URL
 output SERVICE_BACKEND_URL string = backendApp.outputs.URL
 
 /* ------------------------ Authentication & RBAC -------------------------- */
-
-@description('Activate authentication if true')
-output USE_AUTHENTICATION bool = useAuthentication
 
 @description('ID of the tenant we are deploying to')
 output AZURE_AUTH_TENANT_ID string = authTenantId
@@ -567,10 +589,10 @@ output AZURE_OPENAI_ENDPOINT string = _azureOpenAiEndpoint
 output AZURE_OPENAI_API_VERSION string = _azureOpenAiApiVersion
 
 @description('Azure OpenAI Model Deployment Name - Executor Service')
-output EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME string = executorAzureOpenAiDeploymentName
+output EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME string = _executorAzureOpenAiDeploymentName
 
 @description('Azure OpenAI Model Deployment Name - Utility Service')
-output UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME string = utilityAzureOpenAiDeploymentName
+output UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME string = _utilityAzureOpenAiDeploymentName
 
 /* -------------------------- Diagnostic Settings --------------------------- */
 
