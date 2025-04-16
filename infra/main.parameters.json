@@ -11,6 +11,9 @@
     "useAuthentication": {
       "value": "${USE_AUTHENTICATION=false}"
     },
+    "useAiSearch": {
+      "value": "${USE_AI_SEARCH=false}"
+    },
     "authTenantId": {
       "value": "${AZURE_AUTH_TENANT_ID}"
     },
