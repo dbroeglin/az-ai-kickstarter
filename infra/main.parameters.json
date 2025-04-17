@@ -14,6 +14,12 @@
     "useAiSearch": {
       "value": "${USE_AI_SEARCH=false}"
     },
+    "useExistingAzureOpenAi": {
+      "value": "${USE_EXISTING_AZURE_OPENAI=false}"
+    },
+    "useExistingAiSearchService": {
+      "value": "${USE_EXISTING_AI_SEARCH_SERVICE=false}"
+    },
     "authTenantId": {
       "value": "${AZURE_AUTH_TENANT_ID}"
     },
@@ -31,6 +37,9 @@
     },
     "azurePrincipalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
+    },
+    "azureOpenAiName": {
+      "value": "${AZURE_OPENAI_NAME}"
     },
     "azureOpenAiEndpoint": {
       "value": "${AZURE_OPENAI_ENDPOINT}"

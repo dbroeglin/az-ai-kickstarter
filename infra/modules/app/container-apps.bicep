@@ -38,16 +38,20 @@ param externalIngressAllowed bool = true
 
 param exists bool
 
-var keyvalueSecrets = [for secret in items(secrets): {
-  name: secret.key
-  value: secret.value
-}]
+var keyvalueSecrets = [
+  for secret in items(secrets): {
+    name: secret.key
+    value: secret.value
+  }
+]
 
-var keyvaultIdentitySecrets = [for secret in items(keyvaultIdentities): {
-  name: secret.key
-  keyVaultUrl: secret.value.keyVaultUrl
-  identity: secret.value.identity
-}]
+var keyvaultIdentitySecrets = [
+  for secret in items(keyvaultIdentities): {
+    name: secret.key
+    keyVaultUrl: secret.value.keyVaultUrl
+    identity: secret.value.identity
+  }
+]
 
 var environment = [
   for key in objectKeys(env): {
@@ -65,7 +69,9 @@ var secret_refs = [
 
 var environmentVariables = union(environment, secret_refs)
 
-resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = { name: containerAppsEnvironmentName }
+resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
+  name: containerAppsEnvironmentName
+}
 
 module fetchLatestImage './fetch-container-image.bicep' = {
   name: '${name}-fetch-image'
@@ -75,55 +81,58 @@ module fetchLatestImage './fetch-container-image.bicep' = {
   }
 }
 
-resource app 'Microsoft.App/containerApps@2024-08-02-preview' = {
-  name: name
-  location: location
-  tags: union(tags, {'azd-service-name':  serviceName })
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: { '${identityId}': {} }
-  }
-  properties: {
-    managedEnvironmentId: containerAppsEnvironment.id
-    configuration: {
-      ingress:  {
-        external: externalIngressAllowed
-        targetPort: 8000
-        transport: 'auto'
-        corsPolicy: {
-          allowedOrigins: [ 'https://portal.azure.com', 'https://ms.portal.azure.com' ]
+module app 'br/public:avm/res/app/container-app:0.16.0' = {
+  name: '${name}-app'
+  params: {
+    name: name
+    location: location
+    tags: union(tags, { 'azd-service-name': serviceName })
+    managedIdentities: {
+      userAssignedResourceIds: [ identityId ]
+    }
+    environmentResourceId: containerAppsEnvironment.id
+    ingressExternal: externalIngressAllowed
+    ingressTargetPort: 8000
+    ingressTransport: 'auto'
+    ingressAllowInsecure: false
+    corsPolicy: {
+      allowedOrigins: ['https://portal.azure.com', 'https://ms.portal.azure.com']
+    }
+    registries: [
+      {
+        server: '${containerRegistryName}.azurecr.io'
+        identity: identityId
+      }
+    ]
+    secrets: concat(keyvalueSecrets, keyvaultIdentitySecrets)
+    containers: [
+      {
+        image: fetchLatestImage.outputs.?containers[?0].?image ?? 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+        name: 'main'
+        env: environmentVariables
+        resources: {
+          cpu: json('1.0')
+          memory: '2.0Gi'
         }
       }
-      registries: [
-        {
-          server: '${containerRegistryName}.azurecr.io'
-          identity: identityId
-        }
-      ]
-      secrets: concat(keyvalueSecrets, keyvaultIdentitySecrets)
+    ]
+    scaleSettings: {
+      minReplicas: 0
+      maxReplicas: 3
     }
-    template: {
-      containers: [
-        {
-          image: fetchLatestImage.outputs.?containers[?0].?image ?? 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          name: 'main'
-          env: environmentVariables
-          resources: {
-            cpu: json('1.0')
-            memory: '2.0Gi'
-          }
-        }
-      ]
-      scale: {
-        minReplicas: 0
-        maxReplicas: 3
-      }
+    /* TODO:
+    authConfig: {
     }
+    */
   }
 }
 
-output defaultDomain string = containerAppsEnvironment.properties.defaultDomain
+output id string = app.outputs.resourceId
+
 output name string = app.name
-output URL string = 'https://${app.properties.configuration.ingress.fqdn}'
+
+output defaultDomain string = containerAppsEnvironment.properties.defaultDomain
+
+output URL string = 'https://${app.outputs.fqdn}'
+
 output internalUrl string = 'http://${app.name}'
-output id string = app.id

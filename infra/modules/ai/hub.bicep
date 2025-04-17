@@ -30,7 +30,7 @@ param skuName string = 'Basic'
 @allowed(['Basic', 'Free', 'Premium', 'Standard'])
 param skuTier string = 'Basic'
 @description('The public network access setting to use for the AI Studio Hub Resource')
-@allowed(['Enabled','Disabled'])
+@allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
 
 param location string = resourceGroup().location
@@ -80,35 +80,31 @@ resource hub 'Microsoft.MachineLearningServices/workspaces@2024-01-01-preview' =
     }
   }
 
-  resource searchConnection 'connections' =
-    if (!empty(aiSearchName)) {
-      name: aiSearchConnectionName
-      properties: {
-        category: 'CognitiveSearch'
-        authType: 'ApiKey'
-        isSharedToAll: true
-        target: 'https://${search.name}.search.windows.net/'
-        credentials: {
-          key: !empty(aiSearchName) ? search.listAdminKeys().primaryKey : ''
-        }
+  resource searchConnection 'connections' = if (!empty(aiSearchName)) {
+    name: aiSearchConnectionName
+    properties: {
+      category: 'CognitiveSearch'
+      authType: 'ApiKey'
+      isSharedToAll: true
+      target: 'https://${search.name}.search.windows.net/'
+      credentials: {
+        key: !empty(aiSearchName) ? search.listAdminKeys().primaryKey : ''
       }
     }
+  }
 }
 
 resource openAi 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
   name: openAiName
 }
 
-resource search 'Microsoft.Search/searchServices@2021-04-01-preview' existing =
-  if (!empty(aiSearchName)) {
-    scope: resourceGroup(!empty(aiSearchResourceGroupName) ? aiSearchResourceGroupName : resourceGroup().name)
-    name: aiSearchName
-  }
+resource search 'Microsoft.Search/searchServices@2021-04-01-preview' existing = if (!empty(aiSearchName)) {
+  scope: resourceGroup(!empty(aiSearchResourceGroupName) ? aiSearchResourceGroupName : resourceGroup().name)
+  name: aiSearchName
+}
 
 output name string = hub.name
 output id string = hub.id
 output principalId string = hub.identity.principalId
 
-
 // Credits: heavily inspired by https://github.com/Azure-Samples/azd-aistudio-starter
-

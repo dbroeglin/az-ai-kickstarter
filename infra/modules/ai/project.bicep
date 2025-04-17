@@ -41,7 +41,6 @@ resource project 'Microsoft.MachineLearningServices/workspaces@2024-01-01-previe
     publicNetworkAccess: publicNetworkAccess
     hubResourceId: hub.id
   }
-  
 }
 /*
 module mlServiceRoleDataScientist 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.1' = {
