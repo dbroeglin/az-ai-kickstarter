@@ -21,34 +21,34 @@ hooks:
   preprovision:
     windows:
       shell: pwsh
-      run: .\scripts\preprovision.ps1
+      run: .\infra\hooks\preprovision.ps1
       interactive: true
       continueOnError: false
     posix:
       shell: sh
-      run: ./scripts/preprovision.sh
+      run: ./infra/hooks/preprovision.sh
       interactive: true
       continueOnError: false
   postprovision:
     windows:
       shell: pwsh
-      run: .\scripts\postprovision.ps1
+      run: .\infra\hooks\postprovision.ps1
       interactive: true
       continueOnError: false
     posix:
       shell: sh
-      run: ./scripts/postprovision.sh
+      run: ./infra/hooks/postprovision.sh
       interactive: true
       continueOnError: false
   predown:
     windows:
       shell: pwsh
-      run: .\scripts\predown.ps1
+      run: .\infra\hooks\predown.ps1
       interactive: true
       continueOnError: false
     posix:
       shell: sh
-      run: ./scripts/predown.sh
+      run: ./infra/hooks/predown.sh
       interactive: true
       continueOnError: false
 

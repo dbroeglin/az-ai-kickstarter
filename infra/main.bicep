@@ -205,12 +205,12 @@ var _containerAppsEnvironmentName = !empty(containerAppsEnvironmentName)
 
 // These resources only require uniqueness within resource group
 var _appIdentityName = take('${abbreviations.managedIdentityUserAssignedIdentities}app-${environmentName}', 32)
-var _frontendContainerAppName = !empty(frontendContainerAppName)
-  ? frontendContainerAppName
-  : take('${abbreviations.appContainerApps}frontend-${environmentName}', 32)
-var _backendContainerAppName = !empty(backendContainerAppName)
-  ? backendContainerAppName
-  : take('${abbreviations.appContainerApps}backend-${environmentName}', 32)
+var _frontendContainerAppName = empty(frontendContainerAppName)
+  ? take('${abbreviations.appContainerApps}frontend-${environmentName}', 32)
+  : frontendContainerAppName
+var _backendContainerAppName = empty(backendContainerAppName)
+  ? take('${abbreviations.appContainerApps}backend-${environmentName}', 32)
+  : backendContainerAppName
 
 // ------------------------
 // Order is important:
@@ -534,20 +534,31 @@ module frontendApp 'modules/app/container-apps.bicep' = {
           }
         }
       : {}
-  }
-}
-
-module frontendContainerAppAuth 'modules/app/container-apps-auth.bicep' = if (useAuthentication) {
-  name: '${deployment().name}-frontendContainerAppAuthModule'
-  params: {
-    name: frontendApp.outputs.name
-    clientId: authClientAppId
-    clientSecretName: 'microsoft-provider-authentication-secret'
-    openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
-    unauthenticatedClientAction: 'RedirectToLoginPage'
-    allowedApplications: [
-      '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
-    ]
+    authConfig: useAuthentication ? {
+      platform: {
+        enabled: true
+      }
+      globalValidation: {
+        redirectToProvider: 'azureactivedirectory'
+        unauthenticatedClientAction: 'RedirectToLoginPage'
+      }
+      identityProviders: {
+        azureActiveDirectory: {
+          registration: {
+            clientId: authClientAppId
+            clientSecretSettingName: 'microsoft-provider-authentication-secret'
+            openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
+          }
+          validation: {
+            defaultAuthorizationPolicy: {
+              allowedApplications:  [
+                '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
+              ]
+            }
+          }
+        }
+      }
+    } : {}
   }
 }
 
