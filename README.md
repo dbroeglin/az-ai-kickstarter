@@ -56,6 +56,11 @@ See below for installation instructions
 
 [Dependency Install Guide](doc/DEPENDENCY_INSTALL.md)
 
+#### Customizing the deployment
+
+See [infra/README.md](infra/README.md) for instructions about how to 
+customize the deployment 
+
 #### Deploy 
 
 To deploy Azure AI App Kickstarter just run: 
@@ -65,21 +70,6 @@ azd up
 > [!WARNING]
 > This deploys the application with authentication DISABLED.
 
-#### Deploy with authentication enabled
-
-AZD can automatically configure authentication to secure the frontend and/or backend. To do so execute the following command before `azd up`:
-```bash
-azd env set USE_AUTHENTICATION true
-```
-
-If you already executed `azd up` just set the variable and run provisioning again:
-```bash
-azd env set USE_AUTHENTICATION true
-azd provision
-```
-
-> [!WARNING] 
-> The account executing `azd` needs to be able to create Application Registrations in your Azure Entra ID tenant.
 
 ## How it works
 
@@ -124,30 +114,6 @@ For the Backend:
 
 Logs will be streamed to your terminal:
 <img src="doc/images/logging.png" alt="Semantic Kernel Logs" width="800">
-
-## Reusing existing resources
-
-### Reusing AI Services
-
-```bash
-azd env new {Your environment name}
-azd env set AZURE_LOCATION {Your Azure Region. For instance: swedencentral}
-azd env set AZURE_OPENAI_ENDPOINT {Name of existing OpenAI service}
-azd env set AZURE_OPENAI_API_VERSION {API Version of existing OpenAI service}
-azd env set EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME {Deployment name of existing OpenAI service}
-azd env set UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME {Deployment name of existing OpenAI service}
-```
-
-Note that `EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME` and `UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME`can be identical.
-
-### Reusing AI Search
-
-```bash
-azd env set AZURE_SEARCH_SERVICE_NAME {Existing AI Search Service Name}
-
-# If your Azure AI Search Service is in another resource group:
-azd env set AZURE_SEARCH_SERVICE_RESOURCE_GROUP_NAME {Resource group of existing AI Search Service}
-```
 
 ## Code of Conduct
 

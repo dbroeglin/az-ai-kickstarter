@@ -8,36 +8,40 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "useAuthentication": {
-      "value": "${USE_AUTHENTICATION=false}"
-    },
+
     "useAiSearch": {
       "value": "${USE_AI_SEARCH=false}"
+    },
+    "useAuthentication": {
+      "value": "${USE_AUTHENTICATION=false}"
     },
     "useExistingAzureOpenAi": {
       "value": "${USE_EXISTING_AZURE_OPENAI=false}"
     },
-    "useExistingAiSearchService": {
-      "value": "${USE_EXISTING_AI_SEARCH_SERVICE=false}"
+    "useExistingAiSearch": {
+      "value": "${USE_EXISTING_AI_SEARCH=false}"
     },
-    "authTenantId": {
-      "value": "${AZURE_AUTH_TENANT_ID}"
-    },
-    "authClientId": {
-      "value": "${AZURE_CLIENT_APP_ID}"
-    },
-    "authClientSecret": {
-      "value": "${AZURE_CLIENT_APP_SECRET}"
-    },
+
     "frontendExists": {
       "value": "${SERVICE_FRONTEND_RESOURCE_EXISTS=false}"
     },
     "backendExists": {
       "value": "${SERVICE_BACKEND_RESOURCE_EXISTS=false}"
     },
+
+    "authTenantId": {
+      "value": "${AZURE_AUTH_TENANT_ID}"
+    },
     "azurePrincipalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
     },
+    "authClientAppId": {
+      "value": "${AZURE_CLIENT_APP_ID}"
+    },
+    "authClientSecret": {
+      "value": "${AZURE_CLIENT_APP_SECRET}"
+    },
+
     "azureOpenAiName": {
       "value": "${AZURE_OPENAI_NAME}"
     },
@@ -52,12 +56,19 @@
     },
     "utilityAzureOpenAiDeploymentName": {
       "value": "${UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME}"
-    },    
-    "aiSearchServiceName": {
-      "value": "${AZURE_AI_SEARCH_SERVICE_NAME}"
     },
-    "aiSearchResourceGroupName": {
+
+    "azureAiSearchName": {
+      "value": "${AZURE_AI_SEARCH_NAME}"
+    },
+    "azureazureAiSearchResourceGroupName": {
       "value": "${AZURE_AI_SEARCH_RESOURCE_GROUP_NAME}"
+    },
+    "azureAiSearchLocation": {
+      "value": "${AZURE_AI_SEARCH_LOCATION}"
+    },
+    "aiSearchSkuName": {
+      "value": "${AI_SEARCH_SKU_NAME=basic}"
     }
   }
 }

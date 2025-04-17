@@ -15,13 +15,13 @@ param openAiName string
 @description('The OpenAI Cognitive Services account connection name to use for the AI Studio Hub Resource')
 param openAiConnectionName string
 
-@description('The Azure Cognitive Search service name to use for the AI Studio Hub Resource')
+@description('The Azure AI Search service name to use for the AI Studio Hub Resource')
 param aiSearchName string = ''
 
-@description('The Azure Cognitive Search service resource group name to use for the AI Studio Hub Resource')
-param aiSearchResourceGroupName string = ''
+@description('The Azure AI Search service resource group name to use for the AI Studio Hub Resource')
+param azureAiSearchResourceGroupName string = ''
 
-@description('The Azure Cognitive Search service connection name to use for the AI Studio Hub Resource')
+@description('The Azure AI Search service connection name to use for the AI Studio Hub Resource')
 param aiSearchConnectionName string
 
 @description('The SKU name to use for the AI Studio Hub Resource')
@@ -99,7 +99,7 @@ resource openAi 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
 }
 
 resource search 'Microsoft.Search/searchServices@2021-04-01-preview' existing = if (!empty(aiSearchName)) {
-  scope: resourceGroup(!empty(aiSearchResourceGroupName) ? aiSearchResourceGroupName : resourceGroup().name)
+  scope: resourceGroup(!empty(azureAiSearchResourceGroupName) ? azureAiSearchResourceGroupName : resourceGroup().name)
   name: aiSearchName
 }
 

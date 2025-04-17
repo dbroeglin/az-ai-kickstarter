@@ -15,7 +15,7 @@ param environmentName string
 param azurePrincipalId string
 
 @description('Location for all resources')
-param location string = resourceGroup().location
+param location string
 
 @description('Extra tags to be applied to provisioned resources')
 param extraTags object = {}
@@ -23,7 +23,7 @@ param extraTags object = {}
 /* ------------------------ Feature flag parameters ------------------------ */
 
 @description('If true, deploy Azure AI Search Service')
-param useAiSearchService bool = false
+param useAiSearch  bool = false
 
 @description('If true, use and setup authentication with Azure Entra ID')
 param useAuthentication bool = false
@@ -32,8 +32,18 @@ param useAuthentication bool = false
 param useExistingAzureOpenAi bool = false
 
 @description('Set to true to use an existing Azure AI Search service.In that case you will need to provide TODO. Defaults to false.')
-param useExistingAiSearchService bool = false
+param useExistingAiSearch bool = false
 
+/* -----------------------  Azure Open AI  service ------------------------- */
+
+// See https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#availability-1
+@description('Location for the OpenAI resource group')
+@metadata({
+  azd: {
+    type: 'location'
+  }
+})
+param azureOpenAiLocation string = ''
 
 /* -------- Optional externally provided Azure OpenAI configuration -------- */
 
@@ -52,7 +62,7 @@ param executorAzureOpenAiDeploymentName string = ''
 @description('Optional. The name of the Azure OpenAI deployment for the utility to reuse. Used only if useExistingAzureOpenAi is true.')
 param utilityAzureOpenAiDeploymentName string = ''
 
-/* ------------ Optional externally provided search service ---------------- */
+/* -----------------------  Azure AI search service ------------------------ */
 
 @description('Optional. Defines the SKU of an Azure AI Search Service, which determines price tier and capacity limits.')
 @allowed([
@@ -66,11 +76,20 @@ param utilityAzureOpenAiDeploymentName string = ''
 ])
 param aiSearchSkuName string = 'basic'
 
-@description('Name of the Azure AI Search Service to deploy. If not specified, a name will be generated. The maximum length is 260 characters.')
-param aiSearchServiceName string = ''
+// See https://learn.microsoft.com/en-us/azure/search/search-region-support
+@description('Location for the Azure OpenAI Service. Optional: needed only if Azure OpenAI is deployed in a different location than the rest of the resources.')
+@metadata({
+  azd: {
+    type: 'location'
+  }
+})
+param azureAiSearchLocation string = location
 
-@description('The Azure Cognitive Search service resource group name to use for the AI Studio Hub Resource. Optional: needed only if aiSearchServiceName is provided and the service is deployed in a different resource group.')
-param aiSearchResourceGroupName string = ''
+@description('Name of the Azure AI Search Service to deploy. Optional: needed if useExistingAiSearchService is true or you want a custom azureAiSearchName.')
+param azureAiSearchName string = ''
+
+@description('The Azure AI Search service resource group name to reuse. Optional: Needed only if resource group is different from current resource group.')
+param azureAiSearchResourceGroupName string = resourceGroup().name
 
 /* ---------------------------- Shared Resources ---------------------------- */
 
@@ -92,7 +111,7 @@ param authTenantId string = '' // Make sure authTenantId is set if not using AZD
 param authClientSecretName string = 'AZURE-AUTH-CLIENT-SECRET'
 
 @description('The auth client id for the frontend and backend app')
-param authClientId string = ''
+param authClientAppId string = ''
 
 @description('Client secret of the authentication client')
 @secure()
@@ -159,15 +178,20 @@ var _storageAccountName = take(
   '${abbreviations.storageStorageAccounts}${alphaNumericEnvironmentName}${resourceToken}',
   24
 )
-var _azureOpenAiName = take(
-  '${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}',
-  63
-)
-var _aiHubName = take('${abbreviations.aiPortalHub}${environmentName}', 260)
+var _azureOpenAiName = useExistingAzureOpenAi
+  ? azureOpenAiName // if reusing existing service, use the provided name
+  : (empty(azureOpenAiName) // else use only if not empty to override the default name
+      ? take('${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}', 63)
+      : azureOpenAiName)
+
+      var _aiHubName = take('${abbreviations.aiPortalHub}${environmentName}', 260)
 var _aiProjectName = take('${abbreviations.aiPortalProject}${environmentName}', 260)
-var _aiSearchServiceName = empty(aiSearchServiceName)
-  ? take('${abbreviations.searchSearchServices}${environmentName}', 260)
-  : aiSearchServiceName
+
+var _azureAiSearchName = useExistingAiSearch
+  ? azureAiSearchName // if reusing existing service, use the provided name
+  : (empty(azureAiSearchName) // else use only if not empty to override the default name
+      ? take('${abbreviations.searchSearchServices}${environmentName}', 260)
+      : azureAiSearchName)
 
 var _containerRegistryName = !empty(containerRegistryName)
   ? containerRegistryName
@@ -187,7 +211,7 @@ var _frontendContainerAppName = !empty(frontendContainerAppName)
 var _backendContainerAppName = !empty(backendContainerAppName)
   ? backendContainerAppName
   : take('${abbreviations.appContainerApps}backend-${environmentName}', 32)
-  
+
 // ------------------------
 // Order is important:
 // 1. Executor
@@ -210,11 +234,13 @@ var _utilityAzureOpenAiDeploymentName = !empty(utilityAzureOpenAiDeploymentName)
   ? utilityAzureOpenAiDeploymentName
   : deployments[1].name
 
+var _azureAiSearchEndpoint = 'https://${_azureAiSearchName}.search.windows.net'
+
 /* -------------------------------------------------------------------------- */
 /*                                  RESOURCES                                 */
 /* -------------------------------------------------------------------------- */
 
-/* ------------------------------- AI Foudry  ------------------------------- */
+/* ------------------------------- AI Foundry  ------------------------------ */
 
 module hub 'modules/ai/hub.bicep' = {
   name: '${deployment().name}-aiHub'
@@ -230,8 +256,8 @@ module hub 'modules/ai/hub.bicep' = {
     openAiName: useExistingAzureOpenAi ? azureOpenAiName : _azureOpenAiName
     openAiConnectionName: 'aoai-connection'
 
-    aiSearchName: useAiSearchService ? searchService.outputs.name : ''
-    aiSearchResourceGroupName: useAiSearchService ? aiSearchResourceGroupName : ''
+    aiSearchName: useExistingAiSearch ? _azureAiSearchName : ''
+    azureAiSearchResourceGroupName: useAiSearch ? azureAiSearchResourceGroupName : ''
     aiSearchConnectionName: 'search-service-connection'
   }
 }
@@ -319,7 +345,7 @@ module aiServices 'br/public:avm/res/cognitive-services/account:0.10.2' = if (!u
   name: '${deployment().name}-aiServices'
   params: {
     name: _azureOpenAiName
-    location: location
+    location: empty(azureOpenAiLocation) ? location : azureOpenAiLocation
     tags: tags
     kind: 'AIServices'
     customSubDomainName: _azureOpenAiName
@@ -363,12 +389,12 @@ module aiServices 'br/public:avm/res/cognitive-services/account:0.10.2' = if (!u
   }
 }
 
-module searchService 'br/public:avm/res/search/search-service:0.9.2' = if (useAiSearchService) {
+module aiSearchService 'br/public:avm/res/search/search-service:0.9.2' = if (useAiSearch && !useExistingAiSearch) {
   name: '${deployment().name}-aiSearchService'
   scope: resourceGroup()
   params: {
-    name: _aiSearchServiceName
-    location: location
+    name: _azureAiSearchName
+    location: azureAiSearchLocation
     tags: tags
     sku: aiSearchSkuName
     partitionCount: 1
@@ -492,7 +518,7 @@ module frontendApp 'modules/app/container-apps.bicep' = {
       BACKEND_ENDPOINT: backendApp.outputs.URL
 
       // Required for the frontend app to ask for a token for the backend app
-      AZURE_CLIENT_APP_ID: authClientId
+      AZURE_CLIENT_APP_ID: authClientAppId
 
       // Required for container app daprAI
       APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
@@ -515,7 +541,7 @@ module frontendContainerAppAuth 'modules/app/container-apps-auth.bicep' = if (us
   name: '${deployment().name}-frontendContainerAppAuthModule'
   params: {
     name: frontendApp.outputs.name
-    clientId: authClientId
+    clientId: authClientAppId
     clientSecretName: 'microsoft-provider-authentication-secret'
     openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
     unauthenticatedClientAction: 'RedirectToLoginPage'
@@ -570,26 +596,28 @@ module backendApp 'modules/app/container-apps.bicep' = {
 
 /* -------------------------- Feature flags ------------------------------- */
 
-@description('If true, deploy Azure AI Search Service')
-output USE_AI_SEARCH bool = useAiSearchService
-
 @description('If true, use and setup authentication with Azure Entra ID')
 output USE_AUTHENTICATION bool = useAuthentication
 
-@description('if true, reuse existing Azure OpenAI Service')
+@description('If true, deploy Azure AI Search Service')
+output USE_AI_SEARCH bool = useAiSearch
+
+@description('If true, reuse existing Azure OpenAI Service')
 output USE_EXISTING_AZURE_OPENAI bool = useExistingAzureOpenAi
 
+@description('If true, reuse existing Azure AI Search Service')
+output USE_EXISTING_AI_SEARCH bool = useExistingAiSearch
 
 /* --------------------------- Apps Deployment ----------------------------- */
-
-@description('The endpoint of the container registry.') // necessary for azd deploy
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
 
 @description('Endpoint URL of the Frontend service')
 output SERVICE_FRONTEND_URL string = frontendApp.outputs.URL
 
 @description('Endpoint URL of the Backend service')
 output SERVICE_BACKEND_URL string = backendApp.outputs.URL
+
+@description('The endpoint of the container registry.') // necessary for azd deploy
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
 
 /* ------------------------ Authentication & RBAC ------------------------- */
 
@@ -600,9 +628,12 @@ output AZURE_AUTH_TENANT_ID string = authTenantId
 output AZURE_PRINCIPAL_ID string = azurePrincipalId
 
 @description('Application registration client ID')
-output AZURE_CLIENT_APP_ID string = authClientId
+output AZURE_CLIENT_APP_ID string = authClientAppId
 
-/* ------------------------------- Models --------------------------------- */
+/* ---------------------------- Azure OpenAI ------------------------------- */
+
+@description('Azure OpenAI service name')
+output AZURE_OPENAI_NAME string = _azureOpenAiName
 
 @description('Azure OpenAI endpoint - Base URL for API calls to Azure OpenAI')
 output AZURE_OPENAI_ENDPOINT string = _azureOpenAiEndpoint
@@ -618,6 +649,23 @@ output UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME string = _utilityAzureOpenAiDeployme
 
 @description('JSON deployment configuration for the models')
 output AZURE_OPENAI_DEPLOYMENTS object[] = deployments
+
+/* ------------------------------ AI Search --------------------------------- */
+
+@description('Azure AI Search service name')
+output AZURE_AI_SEARCH_NAME string = _azureAiSearchName
+
+@description('Azure AI Search service resource group name')
+output AZURE_AI_SEARCH_RESOURCE_GROUP_NAME string = azureAiSearchResourceGroupName
+
+@description('Azure AI Search deployment location')
+output AZURE_AI_SEARCH_LOCATION string = azureAiSearchLocation
+
+@description('Azure AI Search endpoint SKU name')
+output AZURE_AI_SEARCH_SKU_NAME string = aiSearchSkuName
+
+@description('Azure OpenAI endpoint - Base URL for API calls to Azure OpenAI')
+output AZURE_AI_SEARCH_ENDPOINT string = _azureAiSearchEndpoint
 
 /* -------------------------- Diagnostic Settings --------------------------- */
 
