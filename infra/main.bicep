@@ -425,12 +425,13 @@ module appInsightsComponent 'br/public:avm/res/insights/component:0.6.0' = {
 
 /* ------------------------ Common App Resources  -------------------------- */
 
-module appIdentity './modules/app/identity.bicep' = {
+module appIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = {
   name: '${deployment().name}-appIdentity'
   scope: resourceGroup()
   params: {
+    name: _appIdentityName
     location: location
-    identityName: _appIdentityName
+    tags: tags
   }
 }
 
@@ -560,7 +561,11 @@ module frontendApp 'modules/app/container-apps.bicep' = {
             }
           }
         }
-      : {}
+      : {
+          platform: {
+            enabled: false
+          }
+        }
   }
 }
 

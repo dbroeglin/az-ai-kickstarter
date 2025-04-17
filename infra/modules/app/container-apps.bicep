@@ -3,8 +3,10 @@ metadata description = 'Creates an Azure Container App and deals with initial st
 @description('Name of the container app')
 param name string
 
+@description('The location to deploy the container app to')
 param location string = resourceGroup().location
 
+@description('The tags to apply to the container app')
 param tags object = {}
 
 @description('Environment variables for the container in key value pairs')
@@ -16,6 +18,7 @@ param identityId string
 @description('Name of the service the container app belongs to in azure.yaml')
 param serviceName string
 
+@description('Name of the container registry to use for the container app')
 param containerRegistryName string
 
 @description('Name of the container apps environment to build the app in')
@@ -35,10 +38,7 @@ param externalIngressAllowed bool = true
 @description('The auth config for the container app')
 param authConfig object = {}
 
-// param cosmosDbEndpoint string
-// param cosmosDbName string
-// param cosmosDbContainer string
-
+@description('True if the container app has already been deployed')
 param exists bool
 
 var keyvalueSecrets = [
@@ -127,8 +127,10 @@ module app 'br/public:avm/res/app/container-app:0.16.0' = {
   }
 }
 
-output id string = app.outputs.resourceId
+@description('The resource ID of the Container App.')
+output resourceId string = app.outputs.resourceId
 
+@description('The name of the Container App.')
 output name string = app.name
 
 output defaultDomain string = containerAppsEnvironment.properties.defaultDomain

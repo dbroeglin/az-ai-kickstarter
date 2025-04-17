@@ -51,4 +51,3 @@ hooks:
       run: ./infra/hooks/predown.sh
       interactive: true
       continueOnError: false
-

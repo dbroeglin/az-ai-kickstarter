@@ -13,7 +13,7 @@ azd provision
 
 ## Reusing existing resources
 
-### Reusing AI Services
+### Reusing an existing Azure OpenAI Service
 
 ```bash
 azd env new _new_environment_name_
@@ -25,9 +25,9 @@ azd env set EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME _existing_executor_model_deplo
 azd env set UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME _existing_utility_model_deployment_name_
 ```
 
-Note that `EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME` and `UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME`can be identical.
+Note that `EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME` and `UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME` can be identical.
 
-### Reusing AI Search
+### Reusing an existing Azure AI Search Service
 
 ```bash
 azd env new _your_environment_name_

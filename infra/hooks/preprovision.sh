@@ -84,7 +84,7 @@ if [[ "${USE_AUTHENTICATION-}" =~ "true" ]]; then
         printf "      \033[3;33mApp '$AZURE_CLIENT_APP_ID' already exists, skipping creation\033[0m\n"
     fi
 
-    azd env set AZURE_CLIENT_APP_ID "$AZURE_CLIENT_APP_ID\n"
+    azd env set AZURE_CLIENT_APP_ID "$AZURE_CLIENT_APP_ID"
 
     printf "  \033[32m➜\033[0m Application registration ${app_name} (${AZURE_CLIENT_APP_ID}) done.\n"
 
