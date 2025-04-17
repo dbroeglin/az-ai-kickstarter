@@ -249,9 +249,9 @@ module hub 'modules/ai/hub.bicep' = {
     tags: tags
     name: _aiHubName
     displayName: _aiHubName
-    keyVaultId: keyVault.outputs.resourceId
+    keyVaultId: app.outputs.keyVaultResourceId
     storageAccountId: storageAccount.outputs.resourceId
-    containerRegistryId: containerRegistry.outputs.resourceId
+    containerRegistryId: app.outputs.containerRegistryResourceId
     applicationInsightsId: appInsightsComponent.outputs.resourceId
     openAiName: useExistingAzureOpenAi ? azureOpenAiName : _azureOpenAiName
     openAiConnectionName: 'aoai-connection'
@@ -401,6 +401,46 @@ module aiSearchService 'br/public:avm/res/search/search-service:0.9.2' = if (use
     replicaCount: 1
   }
 }
+/* --------------------------------- App  ----------------------------------- */
+
+
+module appIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = {
+  name: '${deployment().name}-appIdentity'
+  scope: resourceGroup()
+  params: {
+    name: _appIdentityName
+    location: location
+    tags: tags
+  }
+}
+
+module app 'modules/app.bicep' = {
+  name: '${deployment().name}-app'
+  params: {
+    location: location
+    tags: tags
+    appIdentityName: _appIdentityName
+    appInsightsConnectionString: appInsightsComponent.outputs.connectionString
+    authClientAppId: authClientAppId
+    authClientSecret: authClientSecret
+    authClientSecretName: authClientSecretName
+    authTenantId: authTenantId
+    azureOpenAiApiVersion: _azureOpenAiApiVersion
+    azureOpenAiEndpoint: _azureOpenAiEndpoint
+    azurePrincipalId: azurePrincipalId
+    backendContainerAppName: _backendContainerAppName
+    backendExists: backendExists
+    containerAppsEnvironmentName: _containerAppsEnvironmentName
+    containerRegistryName: _containerRegistryName
+    executorAzureOpenAiDeploymentName: _executorAzureOpenAiDeploymentName
+    frontendContainerAppName: _frontendContainerAppName
+    frontendExists: frontendExists
+    keyVaultName: _keyVaultName
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+    useAuthentication: useAuthentication
+    utilityAzureOpenAiDeploymentName: _utilityAzureOpenAiDeploymentName
+  }
+}
 
 /* ---------------------------- Observability  ------------------------------ */
 
@@ -423,185 +463,6 @@ module appInsightsComponent 'br/public:avm/res/insights/component:0.6.0' = {
   }
 }
 
-/* ------------------------ Common App Resources  -------------------------- */
-
-module appIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = {
-  name: '${deployment().name}-appIdentity'
-  scope: resourceGroup()
-  params: {
-    name: _appIdentityName
-    location: location
-    tags: tags
-  }
-}
-
-module containerRegistry 'br/public:avm/res/container-registry/registry:0.9.1' = {
-  name: '${deployment().name}-containerRegistry'
-  params: {
-    name: _containerRegistryName
-    location: location
-    tags: tags
-    acrSku: 'Standard'
-    acrAdminUserEnabled: true
-    roleAssignments: [
-      {
-        roleDefinitionIdOrName: 'AcrPull'
-        principalId: appIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        roleDefinitionIdOrName: 'AcrPull'
-        principalId: azurePrincipalId
-      }
-    ]
-  }
-}
-
-module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
-  name: '${deployment().name}-keyVault'
-  scope: resourceGroup()
-  params: {
-    location: location
-    tags: tags
-    name: _keyVaultName
-    enableRbacAuthorization: true
-    enablePurgeProtection: false // Set to true to if you deploy in production and want to protect against accidental deletion
-    roleAssignments: [
-      {
-        roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalId: appIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        roleDefinitionIdOrName: 'Key Vault Administrator'
-        principalId: azurePrincipalId
-      }
-    ]
-    secrets: useAuthentication && authClientSecret != ''
-      ? [
-          {
-            name: authClientSecretName
-            value: authClientSecret
-          }
-        ]
-      : []
-  }
-}
-
-module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.10.2' = {
-  name: '${deployment().name}-containerAppsEnvironment'
-  params: {
-    name: _containerAppsEnvironmentName
-    location: location
-    tags: tags
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
-    daprAIConnectionString: appInsightsComponent.outputs.connectionString
-    zoneRedundant: false
-    publicNetworkAccess: 'Enabled'
-  }
-}
-
-/* ------------------------------ Frontend App ------------------------------ */
-
-module frontendApp 'modules/app/container-apps.bicep' = {
-  name: '${deployment().name}-frontendContainerApp'
-  scope: resourceGroup()
-  params: {
-    name: _frontendContainerAppName
-    tags: tags
-    identityId: appIdentity.outputs.resourceId
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
-    containerRegistryName: containerRegistry.outputs.name
-    exists: frontendExists
-    serviceName: 'frontend' // Must match the service name in azure.yaml
-    env: {
-      // URL of the backend endpoint, for instance: http://localhost:8000
-      BACKEND_ENDPOINT: backendApp.outputs.URL
-
-      // Required for the frontend app to ask for a token for the backend app
-      AZURE_CLIENT_APP_ID: authClientAppId
-
-      // Required for container app daprAI
-      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
-
-      // Required for managed identity
-      AZURE_CLIENT_ID: appIdentity.outputs.clientId
-    }
-    keyvaultIdentities: useAuthentication
-      ? {
-          'microsoft-provider-authentication-secret': {
-            keyVaultUrl: '${keyVault.outputs.uri}secrets/${authClientSecretName}'
-            identity: appIdentity.outputs.resourceId
-          }
-        }
-      : {}
-    authConfig: useAuthentication
-      ? {
-          platform: {
-            enabled: true
-          }
-          globalValidation: {
-            redirectToProvider: 'azureactivedirectory'
-            unauthenticatedClientAction: 'RedirectToLoginPage'
-          }
-          identityProviders: {
-            azureActiveDirectory: {
-              registration: {
-                clientId: authClientAppId
-                clientSecretSettingName: 'microsoft-provider-authentication-secret'
-                openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
-              }
-              validation: {
-                defaultAuthorizationPolicy: {
-                  allowedApplications: [
-                    '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
-                  ]
-                }
-              }
-            }
-          }
-        }
-      : {
-          platform: {
-            enabled: false
-          }
-        }
-  }
-}
-
-/* ------------------------------ Backend App ------------------------------- */
-
-module backendApp 'modules/app/container-apps.bicep' = {
-  name: '${deployment().name}-backendContainerApp'
-  scope: resourceGroup()
-  params: {
-    name: _backendContainerAppName
-    tags: tags
-    identityId: appIdentity.outputs.resourceId
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
-    containerRegistryName: containerRegistry.outputs.name
-    exists: backendExists
-    serviceName: 'backend' // Must match the service name in azure.yaml
-    externalIngressAllowed: false // Set to true if you intend to call backend from the locallly deployed frontend
-    // Setting to true will allow traffic from anywhere
-    env: {
-      // Required for container app daprAI
-      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
-      AZURE_RESOURCE_GROUP: resourceGroup().name
-      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS: true
-      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS_SENSITIVE: true // OBS! You might want to remove this in production
-
-      // Required for managed identity
-      AZURE_CLIENT_ID: appIdentity.outputs.clientId
-
-      AZURE_OPENAI_API_VERSION: _azureOpenAiApiVersion
-      AZURE_OPENAI_ENDPOINT: _azureOpenAiEndpoint
-      EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME: _executorAzureOpenAiDeploymentName
-      UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME: _utilityAzureOpenAiDeploymentName
-    }
-    secrets: {}
-  }
-}
 
 /* -------------------------------------------------------------------------- */
 /*                                   OUTPUTS                                  */
@@ -629,13 +490,13 @@ output USE_EXISTING_AI_SEARCH bool = useExistingAiSearch
 /* --------------------------- Apps Deployment ----------------------------- */
 
 @description('Endpoint URL of the Frontend service')
-output SERVICE_FRONTEND_URL string = frontendApp.outputs.URL
+output SERVICE_FRONTEND_URL string = app.outputs.frontendAppUrl
 
 @description('Endpoint URL of the Backend service')
-output SERVICE_BACKEND_URL string = backendApp.outputs.URL
+output SERVICE_BACKEND_URL string = app.outputs.backendAppUrl
 
 @description('The endpoint of the container registry.') // necessary for azd deploy
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = app.outputs.containerRegistryLoginServer
 
 /* ------------------------ Authentication & RBAC ------------------------- */
 
