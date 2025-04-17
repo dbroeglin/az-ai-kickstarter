@@ -32,6 +32,9 @@ param secrets object = {}
 @description('External Ingress Allowed?')
 param externalIngressAllowed bool = true
 
+@description('The auth config for the container app')
+param authConfig object = {}
+
 // param cosmosDbEndpoint string
 // param cosmosDbName string
 // param cosmosDbContainer string
@@ -82,7 +85,7 @@ module fetchLatestImage './fetch-container-image.bicep' = {
 }
 
 module app 'br/public:avm/res/app/container-app:0.16.0' = {
-  name: '${name}-app'
+  name: name
   params: {
     name: name
     location: location
@@ -120,10 +123,7 @@ module app 'br/public:avm/res/app/container-app:0.16.0' = {
       minReplicas: 0
       maxReplicas: 3
     }
-    /* TODO:
-    authConfig: {
-    }
-    */
+    authConfig: authConfig
   }
 }
 

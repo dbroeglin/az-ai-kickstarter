@@ -23,7 +23,7 @@ param extraTags object = {}
 /* ------------------------ Feature flag parameters ------------------------ */
 
 @description('If true, deploy Azure AI Search Service')
-param useAiSearch  bool = false
+param useAiSearch bool = false
 
 @description('If true, use and setup authentication with Azure Entra ID')
 param useAuthentication bool = false
@@ -184,7 +184,7 @@ var _azureOpenAiName = useExistingAzureOpenAi
       ? take('${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}', 63)
       : azureOpenAiName)
 
-      var _aiHubName = take('${abbreviations.aiPortalHub}${environmentName}', 260)
+var _aiHubName = take('${abbreviations.aiPortalHub}${environmentName}', 260)
 var _aiProjectName = take('${abbreviations.aiPortalProject}${environmentName}', 260)
 
 var _azureAiSearchName = useExistingAiSearch
@@ -534,31 +534,33 @@ module frontendApp 'modules/app/container-apps.bicep' = {
           }
         }
       : {}
-    authConfig: useAuthentication ? {
-      platform: {
-        enabled: true
-      }
-      globalValidation: {
-        redirectToProvider: 'azureactivedirectory'
-        unauthenticatedClientAction: 'RedirectToLoginPage'
-      }
-      identityProviders: {
-        azureActiveDirectory: {
-          registration: {
-            clientId: authClientAppId
-            clientSecretSettingName: 'microsoft-provider-authentication-secret'
-            openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
+    authConfig: useAuthentication
+      ? {
+          platform: {
+            enabled: true
           }
-          validation: {
-            defaultAuthorizationPolicy: {
-              allowedApplications:  [
-                '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
-              ]
+          globalValidation: {
+            redirectToProvider: 'azureactivedirectory'
+            unauthenticatedClientAction: 'RedirectToLoginPage'
+          }
+          identityProviders: {
+            azureActiveDirectory: {
+              registration: {
+                clientId: authClientAppId
+                clientSecretSettingName: 'microsoft-provider-authentication-secret'
+                openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
+              }
+              validation: {
+                defaultAuthorizationPolicy: {
+                  allowedApplications: [
+                    '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
+                  ]
+                }
+              }
             }
           }
         }
-      }
-    } : {}
+      : {}
   }
 }
 
