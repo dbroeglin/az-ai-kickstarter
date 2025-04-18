@@ -83,13 +83,13 @@ param aiSearchSkuName string = 'basic'
     type: 'location'
   }
 })
-param azureAiSearchLocation string = location
+param azureAiSearchLocation string = ''
 
 @description('Name of the Azure AI Search Service to deploy. Optional: needed if useExistingAiSearchService is true or you want a custom azureAiSearchName.')
 param azureAiSearchName string = ''
 
 @description('The Azure AI Search service resource group name to reuse. Optional: Needed only if resource group is different from current resource group.')
-param azureAiSearchResourceGroupName string = resourceGroup().name
+param azureAiSearchResourceGroupName string = ''
 
 /* ---------------------------- Shared Resources ---------------------------- */
 
@@ -234,6 +234,7 @@ var _utilityAzureOpenAiDeploymentName = !empty(utilityAzureOpenAiDeploymentName)
   ? utilityAzureOpenAiDeploymentName
   : deployments[1].name
 
+var _azureAiSearchLocation = empty(azureAiSearchLocation) ? location : azureAiSearchLocation
 var _azureAiSearchEndpoint = 'https://${_azureAiSearchName}.search.windows.net'
 
 /* -------------------------------------------------------------------------- */
@@ -242,7 +243,7 @@ var _azureAiSearchEndpoint = 'https://${_azureAiSearchName}.search.windows.net'
 
 /* ------------------------------- AI Foundry  ------------------------------ */
 
-module hub 'modules/ai/hub.bicep' = {
+module aiHub 'modules/ai/hub.bicep' = {
   name: '${deployment().name}-aiHub'
   params: {
     location: location
@@ -256,20 +257,20 @@ module hub 'modules/ai/hub.bicep' = {
     openAiName: useExistingAzureOpenAi ? azureOpenAiName : _azureOpenAiName
     openAiConnectionName: 'aoai-connection'
 
-    aiSearchName: useExistingAiSearch ? _azureAiSearchName : ''
+    aiSearchName: useAiSearch ? _azureAiSearchName : ''
     azureAiSearchResourceGroupName: useAiSearch ? azureAiSearchResourceGroupName : ''
     aiSearchConnectionName: 'search-service-connection'
   }
 }
 
-module project 'modules/ai/project.bicep' = {
+module aiProject 'modules/ai/project.bicep' = {
   name: '${deployment().name}-aiProject'
   params: {
     location: location
     tags: tags
     name: _aiProjectName
     displayName: _aiProjectName
-    hubName: hub.outputs.name
+    hubName: aiHub.outputs.name
   }
 }
 
@@ -394,7 +395,7 @@ module aiSearchService 'br/public:avm/res/search/search-service:0.9.2' = if (use
   scope: resourceGroup()
   params: {
     name: _azureAiSearchName
-    location: azureAiSearchLocation
+    location: _azureAiSearchLocation
     tags: tags
     sku: aiSearchSkuName
     partitionCount: 1
@@ -402,7 +403,6 @@ module aiSearchService 'br/public:avm/res/search/search-service:0.9.2' = if (use
   }
 }
 /* --------------------------------- App  ----------------------------------- */
-
 
 module appIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = {
   name: '${deployment().name}-appIdentity'
@@ -462,7 +462,6 @@ module appInsightsComponent 'br/public:avm/res/insights/component:0.6.0' = {
     workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
   }
 }
-
 
 /* -------------------------------------------------------------------------- */
 /*                                   OUTPUTS                                  */
@@ -544,6 +543,7 @@ output AZURE_AI_SEARCH_LOCATION string = azureAiSearchLocation
 output AZURE_AI_SEARCH_SKU_NAME string = aiSearchSkuName
 
 @description('Azure OpenAI endpoint - Base URL for API calls to Azure OpenAI')
+// This environment variable name is used as a default by Semantic Kernel
 output AZURE_AI_SEARCH_ENDPOINT string = _azureAiSearchEndpoint
 
 /* -------------------------- Diagnostic Settings --------------------------- */

@@ -36,7 +36,7 @@ azd env set USE_EXISTING_AI_SEARCH True   # Set to true to re-use existing AI Se
 azd env set AZURE_AI_SEARCH_NAME _existing_ai_search_name_
 
 # If your Azure AI Search Service is in another resource group:
-azd env set AZURE_AI_SEARCH_RESOURCE_GROUP_NAME {Resource group of existing AI Search Service}
+azd env set AZURE_AI_SEARCH_RESOURCE_GROUP_NAME _existing_ai_search_resource_group_name_
 ```
 
 > [!WARNING] 

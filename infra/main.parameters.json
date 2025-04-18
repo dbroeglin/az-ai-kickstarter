@@ -61,7 +61,7 @@
     "azureAiSearchName": {
       "value": "${AZURE_AI_SEARCH_NAME}"
     },
-    "azureazureAiSearchResourceGroupName": {
+    "azureAiSearchResourceGroupName": {
       "value": "${AZURE_AI_SEARCH_RESOURCE_GROUP_NAME}"
     },
     "azureAiSearchLocation": {
