@@ -32,13 +32,16 @@ param containerRegistryId string = ''
 @description('The OpenAI Cognitive Services account name to use for the AI Studio Hub Resource')
 param openAiName string
 
+@description('The Azure OpenAI service resource group name to use if different from current resource group')
+param azureOpenAiResourceGroupName string = ''
+
 @description('The OpenAI Cognitive Services account connection name to use for the AI Studio Hub Resource')
 param openAiConnectionName string
 
 @description('The Azure AI Search service name to use for the AI Studio Hub Resource')
 param aiSearchName string = ''
 
-@description('The Azure AI Search service resource group name to use for the AI Studio Hub Resource')
+@description('The Azure AI Search service resource group name to use if different from current resource group')
 param azureAiSearchResourceGroupName string = ''
 
 @description('The Azure AI Search service connection name to use for the AI Studio Hub Resource')
@@ -114,6 +117,7 @@ resource hub 'Microsoft.MachineLearningServices/workspaces@2024-01-01-preview' =
 }
 
 resource openAi 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
+  scope: resourceGroup(empty(azureOpenAiResourceGroupName) ? resourceGroup().name : azureOpenAiResourceGroupName)
   name: openAiName
 }
 

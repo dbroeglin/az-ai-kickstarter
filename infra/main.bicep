@@ -62,6 +62,9 @@ param executorAzureOpenAiDeploymentName string = ''
 @description('Optional. The name of the Azure OpenAI deployment for the utility to reuse. Used only if useExistingAzureOpenAi is true.')
 param utilityAzureOpenAiDeploymentName string = ''
 
+@description('The Azure OpenAI service resource group name to reuse. Optional: Needed only if resource group is different from current resource group.')
+param azureOpenAiResourceGroupName string = ''
+
 /* -----------------------  Azure AI search service ------------------------ */
 
 @description('Optional. Defines the SKU of an Azure AI Search Service, which determines price tier and capacity limits.')
@@ -255,6 +258,7 @@ module aiHub 'modules/ai/hub.bicep' = {
     containerRegistryId: app.outputs.containerRegistryResourceId
     applicationInsightsId: appInsightsComponent.outputs.resourceId
     openAiName: useExistingAzureOpenAi ? azureOpenAiName : _azureOpenAiName
+    azureOpenAiResourceGroupName: useExistingAzureOpenAi ? azureOpenAiResourceGroupName : ''
     openAiConnectionName: 'aoai-connection'
 
     aiSearchName: useAiSearch ? _azureAiSearchName : ''
