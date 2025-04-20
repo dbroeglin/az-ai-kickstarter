@@ -70,7 +70,6 @@ azd up
 > [!WARNING]
 > This deploys the application with authentication DISABLED.
 
-
 ## How it works
 
 ### Running the frontend 

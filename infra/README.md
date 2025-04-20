@@ -1,4 +1,6 @@
-#### Deploy with authentication enabled
+# Infrastructure as Code documentation
+
+## Deploy with authentication enabled
 
 > [!WARNING] 
 > The account executing `azd` needs to be able to create Application Registrations in your Azure Entra ID tenant.
@@ -49,4 +51,3 @@ azd env set AZURE_AI_SEARCH_NAME _existing_ai_search_name_
 # If your Azure AI Search Service is in another resource group:
 azd env set AZURE_AI_SEARCH_RESOURCE_GROUP_NAME _existing_ai_search_resource_group_name_
 ```
-

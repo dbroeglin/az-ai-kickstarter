@@ -31,5 +31,8 @@ if ($env:USE_AUTHENTICATION -eq "true") {
     if ($AZURE_APP_ID) {
         Write-Host "Deleting app $($env:AZURE_CLIENT_APP_ID)..."
         az ad app delete --id $AZURE_APP_ID
+
+        azd env set AZURE_CLIENT_APP_ID ""
+        azd env set AZURE_CLIENT_APP_SECRET ""        
     }
 }

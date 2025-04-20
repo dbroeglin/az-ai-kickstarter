@@ -70,4 +70,8 @@ resource hub 'Microsoft.MachineLearningServices/workspaces@2024-01-01-preview' e
 @description('The resource id of the AI Studio Hub Resource')
 output resourceId string = project.id
 
+@description('Azure AI Foundry project name')
 output name string = project.name
+
+@description('Azure AI Foundry project connection string')
+output connectionString string = '${split(project.properties.discoveryUrl, '/')[2]};${subscription().subscriptionId};${resourceGroup().name};${project.name}'

@@ -36,7 +36,7 @@ param useExistingAiSearch bool = false
 
 /* -----------------------  Azure Open AI  service ------------------------- */
 
-// See https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#availability-1
+// See also https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#availability-1
 @description('Location for the OpenAI resource group')
 @metadata({
   azd: {
@@ -381,14 +381,32 @@ module aiServices 'br/public:avm/res/cognitive-services/account:0.10.2' = if (!u
       }
     ]
     roleAssignments: [
+      // See also https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/faq
       {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
         principalId: appIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
+        roleDefinitionIdOrName: 'Cognitive Services User'
+        principalId: appIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI Contributor'
         principalId: azurePrincipalId
+        principalType: 'User'
+      }
+      {
+        principalId: azurePrincipalId
+        roleDefinitionIdOrName: 'Cognitive Services User'
+        principalType: 'User'
+      }
+      {
+        // required for Document Intelligence Studio
+        roleDefinitionIdOrName: 'Contributor'
+        principalId: azurePrincipalId
+        principalType: 'User'
       }
     ]
   }
@@ -404,6 +422,24 @@ module aiSearchService 'br/public:avm/res/search/search-service:0.9.2' = if (use
     sku: aiSearchSkuName
     partitionCount: 1
     replicaCount: 1
+    roleAssignments: [
+      // See also https://learn.microsoft.com/en-us/azure/search/search-security-rbac
+      {
+        roleDefinitionIdOrName: 'Search Index Data Contributor'
+        principalId: appIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        roleDefinitionIdOrName: 'Search Index Data Contributor'
+        principalId: azurePrincipalId
+        principalType: 'User'
+      }
+      {
+        roleDefinitionIdOrName: 'Search Service Contributor'
+        principalId: azurePrincipalId
+        principalType: 'User'
+      }
+    ]
   }
 }
 /* --------------------------------- App  ----------------------------------- */
@@ -445,6 +481,20 @@ module app 'modules/app.bicep' = {
     utilityAzureOpenAiDeploymentName: _utilityAzureOpenAiDeploymentName
   }
 }
+
+/* ------------------------------ CosmosDB  --------------------------------- */
+
+/* module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.12.0' = {
+  name: '${deployment().name}-cosmosDbAccount'
+  params: {
+    name: 'dddamin001'
+    location: location
+    sqlRoleAssignmentsPrincipalIds: [
+      azurePrincipalId
+      appIdentity.outputs.principalId
+    ]
+  }
+} */
 
 /* ---------------------------- Observability  ------------------------------ */
 
@@ -511,6 +561,11 @@ output AZURE_PRINCIPAL_ID string = azurePrincipalId
 
 @description('Application registration client ID')
 output AZURE_CLIENT_APP_ID string = authClientAppId
+
+/* -------------------------- Azure AI Foundry ----------------------------- */
+
+@description('Azure AI Project connection string')
+output AZURE_AI_PROJECT_CONNECTION_STRING string = aiProject.outputs.connectionString
 
 /* ---------------------------- Azure OpenAI ------------------------------- */
 
