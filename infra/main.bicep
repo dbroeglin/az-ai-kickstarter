@@ -20,8 +20,6 @@ param location string
 @description('Extra tags to be applied to provisioned resources')
 param extraTags object = {}
 
-/* ------------------------ Feature flag parameters ------------------------ */
-
 @description('If true, deploy Azure AI Search Service')
 param useAiSearch bool = false
 
