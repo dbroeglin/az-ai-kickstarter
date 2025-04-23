@@ -8,38 +8,70 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+
+    "useAiSearch": {
+      "value": "${USE_AI_SEARCH=false}"
+    },
     "useAuthentication": {
       "value": "${USE_AUTHENTICATION=false}"
     },
-    "authTenantId": {
-      "value": "${AZURE_AUTH_TENANT_ID}"
+    "useExistingAzureOpenAi": {
+      "value": "${USE_EXISTING_AZURE_OPENAI=false}"
     },
-    "authClientId": {
-      "value": "${AZURE_CLIENT_APP_ID}"
+    "useExistingAiSearch": {
+      "value": "${USE_EXISTING_AI_SEARCH=false}"
     },
-    "authClientSecret": {
-      "value": "${AZURE_CLIENT_APP_SECRET}"
-    },
+
     "frontendExists": {
       "value": "${SERVICE_FRONTEND_RESOURCE_EXISTS=false}"
     },
     "backendExists": {
       "value": "${SERVICE_BACKEND_RESOURCE_EXISTS=false}"
     },
+
+    "authTenantId": {
+      "value": "${AZURE_AUTH_TENANT_ID}"
+    },
     "azurePrincipalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
     },
-    "plannerEndpointParam": {
-      "value": "${PLANNER_AZURE_OPENAI_ENDPOINT}"
+    "authClientAppId": {
+      "value": "${AZURE_CLIENT_APP_ID}"
     },
-    "plannerDeploymentNameParam": {
-      "value": "${PLANNER_AZURE_OPENAI_DEPLOYMENT_NAME}"
+    "authClientSecret": {
+      "value": "${AZURE_CLIENT_APP_SECRET}"
     },
-    "plannerKeyParam": {
-      "value": "${plannerkeysecret}"
+
+    "azureOpenAiName": {
+      "value": "${AZURE_OPENAI_NAME}"
     },
-    "plannerApiVersionParam": {
-      "value": "${PLANNER_AZURE_OPENAI_API_VERSION}"
+    "azureOpenAiEndpoint": {
+      "value": "${AZURE_OPENAI_ENDPOINT}"
+    },
+    "azureOpenAiApiVersion": {
+      "value": "${AZURE_OPENAI_API_VERSION}"
+    },
+    "azureOpenAiResourceGroupName": {
+      "value": "${AZURE_OPENAI_RESOURCE_GROUP_NAME}"
+    },
+    "executorAzureOpenAiDeploymentName": {
+      "value": "${EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME}"
+    },
+    "utilityAzureOpenAiDeploymentName": {
+      "value": "${UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME}"
+    },
+
+    "azureAiSearchName": {
+      "value": "${AZURE_AI_SEARCH_NAME}"
+    },
+    "azureAiSearchResourceGroupName": {
+      "value": "${AZURE_AI_SEARCH_RESOURCE_GROUP_NAME}"
+    },
+    "azureAiSearchLocation": {
+      "value": "${AZURE_AI_SEARCH_LOCATION}"
+    },
+    "aiSearchSkuName": {
+      "value": "${AI_SEARCH_SKU_NAME=basic}"
     }
   }
 }

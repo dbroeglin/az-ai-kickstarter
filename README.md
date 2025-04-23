@@ -56,6 +56,11 @@ See below for installation instructions
 
 [Dependency Install Guide](doc/DEPENDENCY_INSTALL.md)
 
+#### Customizing the deployment
+
+See [infra/README.md](infra/README.md) for instructions about how to 
+customize the deployment 
+
 #### Deploy 
 
 To deploy Azure AI App Kickstarter just run: 
@@ -64,36 +69,6 @@ azd up
 ``` 
 > [!WARNING]
 > This deploys the application with authentication DISABLED.
-
-#### Deploy with authentication enabled
-
-AZD can automatically configure authentication to secure the frontend and/or backend. To do so execute the following command before `azd up`:
-```bash
-azd env set USE_AUTHENTICATION true
-```
-
-If you already executed `azd up` just set the variable and run provisioning again:
-```bash
-azd env set USE_AUTHENTICATION true
-azd provision
-```
-
-> [!WARNING] 
-> The account executing `azd` needs to be able to create Application Registrations in your Azure Entra ID tenant.
-
-#### External Model
-
-If you have an external Azure OpenAI model already provisioned, you can reference it by setting environment variable prior callin `azd up`
-
-```sh
-export AOAI_ENDPOINT="https://<endpoint>.openai.azure.com"
-export AOAI_DEPLOYMENT_NAME="gpt-4o-2024-11-20"
-export AOAI_API_VERSION="2024-12-01-preview"
-export aoaikeysecret="key"
-```
-
->[WARNING!] The `aoaikeysecret` is not set in azd .azure/<env>./.env file automatically.
-> In order to use it when running the model locally, either set it as env variable or add it to azd `.env` file.
 
 ## How it works
 

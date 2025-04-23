@@ -1,6 +1,6 @@
 metadata name = 'az-ai-kickstarter'
 metadata description = 'Deploys the infrastructure for Azure AI App Kickstarter'
-metadata author = 'AI GBB EMEA <eminkevich@microsoft.com>'
+metadata author = 'AI GBB EMEA <eminkevich@microsoft.com>; <dobroegl@microsoft.com>'
 
 /* -------------------------------------------------------------------------- */
 /*                                 PARAMETERS                                 */
@@ -14,27 +14,83 @@ param environmentName string
 @description('Principal ID of the user running the deployment')
 param azurePrincipalId string
 
+@description('Location for all resources')
+param location string
+
 @description('Extra tags to be applied to provisioned resources')
 param extraTags object = {}
 
-@description('Location for all resources')
-// temporarily commenting out due to: https://github.com/Azure/azure-dev/issues/5059
-//param location string = resourceGroup().location
-param location string
+@description('If true, deploy Azure AI Search Service')
+param useAiSearch bool = false
 
-/* ------------ Optional externally provided model configuration ------------ */
+@description('If true, use and setup authentication with Azure Entra ID')
+param useAuthentication bool = false
 
-@description('Optional. Externally provided model end point')
-param plannerEndpointParam string = ''
+@description('Set to true to use an existing Azure OpenAI service.In that case you will need to provide azureOpenAiEndpoint, azureOpenAiApiVersion, executorAzureOpenAiDeploymentName and utilityAzureOpenAiDeploymentName. Defaults to false.')
+param useExistingAzureOpenAi bool = false
 
-@description('Optional. Externally provided model deployment name')
-param plannerDeploymentNameParam string = ''
+@description('Set to true to use an existing Azure AI Search service.In that case you will need to provide TODO. Defaults to false.')
+param useExistingAiSearch bool = false
 
-@description('Optional. Externally provided model API version')
-param plannerApiVersionParam string = ''
+/* -----------------------  Azure Open AI  service ------------------------- */
 
-@description('Optional. Externally provided model key')
-param plannerKeyParam string = ''
+// See also https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#availability-1
+@description('Location for the OpenAI resource group')
+@metadata({
+  azd: {
+    type: 'location'
+  }
+})
+param azureOpenAiLocation string = ''
+
+/* -------- Optional externally provided Azure OpenAI configuration -------- */
+
+@description('Optional. The name of the Azure OpenAI resource to reuse. Used only if useExistingAzureOpenAi is true.')
+param azureOpenAiName string = ''
+
+@description('Optional. The endpoint of the Azure OpenAI resource to reuse. Used only if useExistingAzureOpenAi is true.')
+param azureOpenAiEndpoint string = ''
+
+@description('Optional. The API version of the Azure OpenAI resource to reuse. Used only if useExistingAzureOpenAi is true.')
+param azureOpenAiApiVersion string = ''
+
+@description('Optional. The name of the Azure OpenAI deployment for the executor to reuse. Used only if useExistingAzureOpenAi is true.')
+param executorAzureOpenAiDeploymentName string = ''
+
+@description('Optional. The name of the Azure OpenAI deployment for the utility to reuse. Used only if useExistingAzureOpenAi is true.')
+param utilityAzureOpenAiDeploymentName string = ''
+
+@description('The Azure OpenAI service resource group name to reuse. Optional: Needed only if resource group is different from current resource group.')
+param azureOpenAiResourceGroupName string = ''
+
+/* -----------------------  Azure AI search service ------------------------ */
+
+@description('Optional. Defines the SKU of an Azure AI Search Service, which determines price tier and capacity limits.')
+@allowed([
+  'basic'
+  'free'
+  'standard'
+  'standard2'
+  'standard3'
+  'storage_optimized_l1'
+  'storage_optimized_l2'
+])
+param aiSearchSkuName string = 'basic'
+
+// See https://learn.microsoft.com/en-us/azure/search/search-region-support
+@description('Location for the Azure OpenAI Service. Optional: needed only if Azure OpenAI is deployed in a different location than the rest of the resources.')
+@metadata({
+  azd: {
+    type: 'location'
+  }
+})
+param azureAiSearchLocation string = ''
+
+@description('Name of the Azure AI Search Service to deploy. Optional: needed if useExistingAiSearchService is true or you want a custom azureAiSearchName.')
+param azureAiSearchName string = ''
+
+@description('The Azure AI Search service resource group name to reuse. Optional: Needed only if resource group is different from current resource group.')
+param azureAiSearchResourceGroupName string = ''
 
 /* ---------------------------- Shared Resources ---------------------------- */
 
@@ -49,29 +105,14 @@ param applicationInsightsName string = ''
 @description('Application Insights Location')
 param appInsightsLocation string = location
 
-@description('Activate authentication if true. Defaults to false.')
-param useAuthentication bool = false
-
-@description('Optional. Defines the SKU of an Azure AI Search Service, which determines price tier and capacity limits.')
-@allowed([
-  'basic'
-  'free'
-  'standard'
-  'standard2'
-  'standard3'
-  'storage_optimized_l1'
-  'storage_optimized_l2'
-])
-param aiSearchSkuName string = 'basic'
-
-@description('The auth tenant id for the frontend and backend app (leave blank in AZD to use your current tenant)')
+@description('The auth tenant id for the app (leave blank in AZD to use your current tenant)')
 param authTenantId string = '' // Make sure authTenantId is set if not using AZD
 
 @description('Name of the authentication client secret in the key vault')
 param authClientSecretName string = 'AZURE-AUTH-CLIENT-SECRET'
 
 @description('The auth client id for the frontend and backend app')
-param authClientId string = ''
+param authClientAppId string = ''
 
 @description('Client secret of the authentication client')
 @secure()
@@ -125,65 +166,6 @@ var tags = union(
   extraTags
 )
 
-@description('Azure OpenAI API Version')
-var azureOpenAiApiVersion = '2024-12-01-preview'
-
-// ------------------------
-// Order is important:
-// 1. Executor
-// 2. Utility
-// 3. Planner (not implemented yet)
-@description('Model deployment configurations')
-var deployments = [
-  {
-    name: 'gpt-4o-2024-11-20'
-    sku: {
-      name: 'GlobalStandard'
-      capacity: 50
-    }
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4o'
-      version: '2024-11-20'
-    }
-    versionUpgradeOption: 'OnceCurrentVersionExpired'
-  }
-  {
-    name: 'gpt-4o-mini-2024-07-18'
-    sku: {
-      name: 'GlobalStandard'
-      capacity: 50
-    }
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4o-mini'
-      version: '2024-07-18'
-    }
-    versionUpgradeOption: 'OnceCurrentVersionExpired'
-  }
-  // {
-  //   name: 'o3-mini-2025-01-31'
-  //   sku: {
-  //     name: 'GlobalStandard'
-  //     capacity: 50
-  //   }
-  //   model: {
-  //     format: 'OpenAI'
-  //     name: 'o3-mini'
-  //     version: '2025-01-31'
-  //   }
-  //   versionUpgradeOption: 'OnceCurrentVersionExpired'
-  // }
-]
-
-var azureOpenAiApiEndpoint = azureOpenAi.outputs.endpoint
-var executorAzureOpenAiDeploymentName = deployments[0].name
-var utilityAzureOpenAiDeploymentName =  deployments[1].name
-
-var plannerAzureOpenAiApiVersion = empty(plannerApiVersionParam) ? '2024-12-01-preview' : plannerApiVersionParam
-var plannerAzureOpenAiApiEndpoint = empty(plannerEndpointParam) ? azureOpenAi.outputs.endpoint : plannerEndpointParam
-var plannerAzureOpenAiDeploymentName = empty(plannerDeploymentNameParam) ? deployments[0].name : plannerDeploymentNameParam
-
 /* --------------------- Globally Unique Resource Names --------------------- */
 
 var _applicationInsightsName = !empty(applicationInsightsName)
@@ -197,13 +179,20 @@ var _storageAccountName = take(
   '${abbreviations.storageStorageAccounts}${alphaNumericEnvironmentName}${resourceToken}',
   24
 )
-var _azureOpenAiName = take(
-  '${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}',
-  63
-)
+var _azureOpenAiName = useExistingAzureOpenAi
+  ? azureOpenAiName // if reusing existing service, use the provided name
+  : (empty(azureOpenAiName) // else use only if not empty to override the default name
+      ? take('${abbreviations.cognitiveServicesOpenAI}${alphaNumericEnvironmentName}${resourceToken}', 63)
+      : azureOpenAiName)
+
 var _aiHubName = take('${abbreviations.aiPortalHub}${environmentName}', 260)
 var _aiProjectName = take('${abbreviations.aiPortalProject}${environmentName}', 260)
-var _aiSearchServiceName = take('${abbreviations.searchSearchServices}${environmentName}', 260)
+
+var _azureAiSearchName = useExistingAiSearch
+  ? azureAiSearchName // if reusing existing service, use the provided name
+  : (empty(azureAiSearchName) // else use only if not empty to override the default name
+      ? take('${abbreviations.searchSearchServices}${environmentName}', 260)
+      : azureAiSearchName)
 
 var _containerRegistryName = !empty(containerRegistryName)
   ? containerRegistryName
@@ -215,56 +204,80 @@ var _containerAppsEnvironmentName = !empty(containerAppsEnvironmentName)
 
 /* ----------------------------- Resource Names ----------------------------- */
 
-var _frontendIdentityName = take(
-  '${abbreviations.managedIdentityUserAssignedIdentities}frontend-${environmentName}',
-  32
-)
-var _frontendContainerAppName = !empty(frontendContainerAppName)
-  ? frontendContainerAppName
-  : take('${abbreviations.appContainerApps}frontend-${environmentName}', 32)
-var _backendIdentityName = take('${abbreviations.managedIdentityUserAssignedIdentities}backend-${environmentName}', 32)
-var _backendContainerAppName = !empty(backendContainerAppName)
-  ? backendContainerAppName
-  : take('${abbreviations.appContainerApps}backend-${environmentName}', 32)
+// These resources only require uniqueness within resource group
+var _appIdentityName = take('${abbreviations.managedIdentityUserAssignedIdentities}app-${environmentName}', 32)
+var _frontendContainerAppName = empty(frontendContainerAppName)
+  ? take('${abbreviations.appContainerApps}frontend-${environmentName}', 32)
+  : frontendContainerAppName
+var _backendContainerAppName = empty(backendContainerAppName)
+  ? take('${abbreviations.appContainerApps}backend-${environmentName}', 32)
+  : backendContainerAppName
+
+// ------------------------
+// Order is important:
+// 1. Executor
+// 2. Utility
+@description('Model deployment configurations')
+var deployments = loadYamlContent('./deployments.yaml')
+
+var _azureOpenAiEndpoint = useExistingAzureOpenAi ? azureOpenAiEndpoint : aiServices.outputs.endpoint
+
+@description('Azure OpenAI API Version')
+var _azureOpenAiApiVersion = empty(azureOpenAiApiVersion) ? '2024-12-01-preview' : azureOpenAiApiVersion
+
+@description('Azure OpenAI Model Deployment Name - Executor Service')
+var _executorAzureOpenAiDeploymentName = !empty(executorAzureOpenAiDeploymentName)
+  ? executorAzureOpenAiDeploymentName
+  : deployments[0].name
+
+@description('Azure OpenAI Model Deployment Name - Utility Service')
+var _utilityAzureOpenAiDeploymentName = !empty(utilityAzureOpenAiDeploymentName)
+  ? utilityAzureOpenAiDeploymentName
+  : deployments[1].name
+
+var _azureAiSearchLocation = empty(azureAiSearchLocation) ? location : azureAiSearchLocation
+var _azureAiSearchEndpoint = 'https://${_azureAiSearchName}.search.windows.net'
 
 /* -------------------------------------------------------------------------- */
 /*                                  RESOURCES                                 */
 /* -------------------------------------------------------------------------- */
 
-/* -------------------------------- AI Infra  ------------------------------- */
+/* ------------------------------- AI Foundry  ------------------------------ */
 
-module hub 'modules/ai/hub.bicep' = {
-  name: 'hub'
+module aiHub 'modules/ai/hub.bicep' = {
+  name: '${deployment().name}-aiHub'
   params: {
     location: location
     tags: tags
     name: _aiHubName
     displayName: _aiHubName
-    keyVaultId: keyVault.outputs.resourceId
+    keyVaultId: app.outputs.keyVaultResourceId
     storageAccountId: storageAccount.outputs.resourceId
-    containerRegistryId: containerRegistry.outputs.resourceId
+    containerRegistryId: app.outputs.containerRegistryResourceId
     applicationInsightsId: appInsightsComponent.outputs.resourceId
-    openAiName: azureOpenAi.outputs.name
+    openAiName: useExistingAzureOpenAi ? azureOpenAiName : _azureOpenAiName
+    azureOpenAiResourceGroupName: useExistingAzureOpenAi ? azureOpenAiResourceGroupName : ''
     openAiConnectionName: 'aoai-connection'
-    openAiContentSafetyConnectionName: 'aoai-content-safety-connection'
-    aiSearchName: searchService.outputs.name
+
+    aiSearchName: useAiSearch ? _azureAiSearchName : ''
+    azureAiSearchResourceGroupName: useAiSearch ? azureAiSearchResourceGroupName : ''
     aiSearchConnectionName: 'search-service-connection'
   }
 }
 
-module project 'modules/ai/project.bicep' = {
-  name: 'project'
+module aiProject 'modules/ai/project.bicep' = {
+  name: '${deployment().name}-aiProject'
   params: {
     location: location
     tags: tags
     name: _aiProjectName
     displayName: _aiProjectName
-    hubName: hub.outputs.name
+    hubName: aiHub.outputs.name
   }
 }
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
-  name: 'storageAccount'
+module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
+  name: '${deployment().name}-storageAccount'
   scope: resourceGroup()
   params: {
     location: location
@@ -307,10 +320,16 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
           roleAssignments: [
             {
               roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-              principalId: backendIdentity.outputs.principalId
+              principalId: appIdentity.outputs.principalId
               principalType: 'ServicePrincipal'
             }
           ]
+        }
+      ]
+      roleAssignments: [
+        {
+          roleDefinitionIdOrName: 'Storage Blob Data Contributor'
+          principalId: azurePrincipalId
         }
       ]
       deleteRetentionPolicy: {
@@ -325,47 +344,160 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
   }
 }
 
-module azureOpenAi 'modules/ai/cognitiveservices.bicep' = {
-  name: 'cognitiveServices'
+module aiServices 'br/public:avm/res/cognitive-services/account:0.10.2' = if (!useExistingAzureOpenAi) {
+  name: '${deployment().name}-aiServices'
   params: {
-    location: location
-    tags: tags
     name: _azureOpenAiName
+    location: empty(azureOpenAiLocation) ? location : azureOpenAiLocation
+    tags: tags
     kind: 'AIServices'
     customSubDomainName: _azureOpenAiName
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+    }
+    disableLocalAuth: false
+    sku: 'S0'
     deployments: deployments
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+    diagnosticSettings: [
+      {
+        name: 'customSetting'
+        logCategoriesAndGroups: [
+          {
+            category: 'RequestResponse'
+          }
+          {
+            category: 'Audit'
+          }
+        ]
+        metricCategories: [
+          {
+            category: 'AllMetrics'
+          }
+        ]
+        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+      }
+    ]
     roleAssignments: [
+      // See also https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/faq
       {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-        principalId: backendIdentity.outputs.principalId
+        principalId: appIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        roleDefinitionIdOrName: 'Cognitive Services User'
+        principalId: appIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
       {
         roleDefinitionIdOrName: 'Cognitive Services OpenAI Contributor'
         principalId: azurePrincipalId
+        principalType: 'User'
+      }
+      {
+        principalId: azurePrincipalId
+        roleDefinitionIdOrName: 'Cognitive Services User'
+        principalType: 'User'
+      }
+      {
+        // required for Document Intelligence Studio
+        roleDefinitionIdOrName: 'Contributor'
+        principalId: azurePrincipalId
+        principalType: 'User'
       }
     ]
   }
 }
 
-module searchService 'br/public:avm/res/search/search-service:0.9.2' = {
-  name: _aiSearchServiceName
+module aiSearchService 'br/public:avm/res/search/search-service:0.9.2' = if (useAiSearch && !useExistingAiSearch) {
+  name: '${deployment().name}-aiSearchService'
   scope: resourceGroup()
   params: {
+    name: _azureAiSearchName
+    location: _azureAiSearchLocation
+    tags: tags
+    sku: aiSearchSkuName
+    partitionCount: 1
+    replicaCount: 1
+    roleAssignments: [
+      // See also https://learn.microsoft.com/en-us/azure/search/search-security-rbac
+      {
+        roleDefinitionIdOrName: 'Search Index Data Contributor'
+        principalId: appIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        roleDefinitionIdOrName: 'Search Index Data Contributor'
+        principalId: azurePrincipalId
+        principalType: 'User'
+      }
+      {
+        roleDefinitionIdOrName: 'Search Service Contributor'
+        principalId: azurePrincipalId
+        principalType: 'User'
+      }
+    ]
+  }
+}
+/* --------------------------------- App  ----------------------------------- */
+
+module appIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = {
+  name: '${deployment().name}-appIdentity'
+  scope: resourceGroup()
+  params: {
+    name: _appIdentityName
     location: location
     tags: tags
-    name: _aiSearchServiceName
-    sku: aiSearchSkuName
-    replicaCount: 1
-    partitionCount: 1
   }
 }
 
+module app 'modules/app.bicep' = {
+  name: '${deployment().name}-app'
+  params: {
+    location: location
+    tags: tags
+    appIdentityName: _appIdentityName
+    appInsightsConnectionString: appInsightsComponent.outputs.connectionString
+    authClientAppId: authClientAppId
+    authClientSecret: authClientSecret
+    authClientSecretName: authClientSecretName
+    authTenantId: authTenantId
+    azureOpenAiApiVersion: _azureOpenAiApiVersion
+    azureOpenAiEndpoint: _azureOpenAiEndpoint
+    azurePrincipalId: azurePrincipalId
+    backendContainerAppName: _backendContainerAppName
+    backendExists: backendExists
+    containerAppsEnvironmentName: _containerAppsEnvironmentName
+    containerRegistryName: _containerRegistryName
+    executorAzureOpenAiDeploymentName: _executorAzureOpenAiDeploymentName
+    frontendContainerAppName: _frontendContainerAppName
+    frontendExists: frontendExists
+    keyVaultName: _keyVaultName
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+    useAuthentication: useAuthentication
+    utilityAzureOpenAiDeploymentName: _utilityAzureOpenAiDeploymentName
+  }
+}
+
+/* ------------------------------ CosmosDB  --------------------------------- */
+
+/* module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.12.0' = {
+  name: '${deployment().name}-cosmosDbAccount'
+  params: {
+    name: 'dddamin001'
+    location: location
+    sqlRoleAssignmentsPrincipalIds: [
+      azurePrincipalId
+      appIdentity.outputs.principalId
+    ]
+  }
+} */
+
 /* ---------------------------- Observability  ------------------------------ */
 
-module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.9.1' = {
-  name: 'workspaceDeployment'
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.11.1' = {
+  name: '${deployment().name}-workspaceDeployment'
   params: {
     name: _logAnalyticsWorkspaceName
     location: location
@@ -374,188 +506,12 @@ module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0
   }
 }
 
-module appInsightsComponent 'br/public:avm/res/insights/component:0.4.2' = {
-  name: _applicationInsightsName
+module appInsightsComponent 'br/public:avm/res/insights/component:0.6.0' = {
+  name: '${deployment().name}-applicationInsights'
   params: {
     name: _applicationInsightsName
     location: appInsightsLocation
     workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
-  }
-}
-
-/* ------------------------ Common App Resources  -------------------------- */
-
-module containerRegistry 'modules/app/container-registry.bicep' = {
-  name: _containerRegistryName
-  scope: resourceGroup()
-  params: {
-    location: location
-    pullingIdentityNames: [
-      _frontendIdentityName
-      _backendIdentityName
-    ]
-    tags: tags
-    name: '${abbreviations.containerRegistryRegistries}${resourceToken}'
-  }
-}
-
-module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1' = {
-  name: 'containerAppsEnvironment'
-  params: {
-    name: _containerAppsEnvironmentName
-    location: location
-    tags: tags
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
-    daprAIConnectionString: appInsightsComponent.outputs.connectionString
-    zoneRedundant: false
-  }
-}
-
-module keyVault 'br/public:avm/res/key-vault/vault:0.11.0' = {
-  name: 'keyVault'
-  scope: resourceGroup()
-  params: {
-    location: location
-    tags: tags
-    name: _keyVaultName
-    enableRbacAuthorization: true
-    enablePurgeProtection: false // Set to true to if you deploy in production and want to protect against accidental deletion
-    roleAssignments: [
-      {
-        roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalId: frontendIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalId: backendIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        principalId: azurePrincipalId
-        roleDefinitionIdOrName: 'Key Vault Administrator'
-      }
-    ]
-    secrets: useAuthentication && authClientSecret != ''
-      ? [
-          {
-            name: authClientSecretName
-            value: authClientSecret
-          }
-        ]
-      : []
-  }
-}
-
-/* ------------------------------ Frontend App ------------------------------ */
-
-module frontendIdentity './modules/app/identity.bicep' = {
-  name: 'frontendIdentity'
-  scope: resourceGroup()
-  params: {
-    location: location
-    identityName: _frontendIdentityName
-  }
-}
-
-module frontendApp 'modules/app/container-apps.bicep' = {
-  name: 'frontend-container-app'
-  scope: resourceGroup()
-  params: {
-    name: _frontendContainerAppName
-    tags: tags
-    identityId: frontendIdentity.outputs.resourceId
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
-    containerRegistryName: containerRegistry.outputs.name
-    exists: frontendExists
-    serviceName: 'frontend' // Must match the service name in azure.yaml
-    env: {
-      // URL of the backend endpoint, for instance: http://localhost:8000
-      BACKEND_ENDPOINT: backendApp.outputs.URL
-
-      // Required for the frontend app to ask for a token for the backend app
-      AZURE_CLIENT_APP_ID: authClientId
-
-      // Required for container app daprAI
-      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
-
-      // Required for managed identity
-      AZURE_CLIENT_ID: frontendIdentity.outputs.clientId
-    }
-    keyvaultIdentities: useAuthentication
-      ? {
-          'microsoft-provider-authentication-secret': {
-            keyVaultUrl: '${keyVault.outputs.uri}secrets/${authClientSecretName}'
-            identity: frontendIdentity.outputs.resourceId
-          }
-        }
-      : {}
-  }
-}
-
-module frontendContainerAppAuth 'modules/app/container-apps-auth.bicep' = if (useAuthentication) {
-  name: 'frontend-container-app-auth-module'
-  params: {
-    name: frontendApp.outputs.name
-    clientId: authClientId
-    clientSecretName: 'microsoft-provider-authentication-secret'
-    openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0' // Works only for Microsoft Entra
-    unauthenticatedClientAction: 'RedirectToLoginPage'
-    allowedApplications: [
-      '04b07795-8ddb-461a-bbee-02f9e1bf7b46' // AZ CLI for testing purposes
-    ]
-  }
-}
-
-/* ------------------------------ Backend App ------------------------------- */
-
-module backendIdentity './modules/app/identity.bicep' = {
-  name: 'backendIdentity'
-  scope: resourceGroup()
-  params: {
-    location: location
-    identityName: _backendIdentityName
-  }
-}
-
-module backendApp 'modules/app/container-apps.bicep' = {
-  name: 'backend-container-app'
-  scope: resourceGroup()
-  params: {
-    name: _backendContainerAppName
-    tags: tags
-    identityId: backendIdentity.outputs.resourceId
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
-    containerRegistryName: containerRegistry.outputs.name
-    exists: backendExists
-    serviceName: 'backend' // Must match the service name in azure.yaml
-    externalIngressAllowed: false // Set to true if you intend to call backend from the locallly deployed frontend
-                                  // Setting to true will allow traffic from anywhere
-    env: {
-      // Required for container app daprAI
-      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsComponent.outputs.connectionString
-      AZURE_RESOURCE_GROUP: resourceGroup().name
-      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS: true
-      SEMANTICKERNEL_EXPERIMENTAL_GENAI_ENABLE_OTEL_DIAGNOSTICS_SENSITIVE: true // OBS! You might want to remove this in production
-
-      // Required for managed identity
-      AZURE_CLIENT_ID: backendIdentity.outputs.clientId
-
-      AZURE_OPENAI_API_VERSION: azureOpenAiApiVersion
-      AZURE_OPENAI_ENDPOINT: azureOpenAiApiEndpoint
-      EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME: executorAzureOpenAiDeploymentName
-      UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME: utilityAzureOpenAiDeploymentName
-
-      PLANNER_AZURE_OPENAI_ENDPOINT: plannerAzureOpenAiApiEndpoint
-      PLANNER_AZURE_OPENAI_API_VERSION: plannerAzureOpenAiApiVersion
-      PLANNER_AZURE_OPENAI_DEPLOYMENT_NAME: plannerAzureOpenAiDeploymentName
-    }
-    secrets: union(
-      {},
-      empty(plannerKeyParam) ? {} : {
-        plannerkeysecret: plannerKeyParam
-      }
-    )
   }
 }
 
@@ -568,23 +524,32 @@ module backendApp 'modules/app/container-apps.bicep' = {
 // `azd env get-values --output json` for json output.
 // To generate your own `.env` file run `azd env get-values > .env`
 
+/* -------------------------- Feature flags ------------------------------- */
+
+@description('If true, use and setup authentication with Azure Entra ID')
+output USE_AUTHENTICATION bool = useAuthentication
+
+@description('If true, deploy Azure AI Search Service')
+output USE_AI_SEARCH bool = useAiSearch
+
+@description('If true, reuse existing Azure OpenAI Service')
+output USE_EXISTING_AZURE_OPENAI bool = useExistingAzureOpenAi
+
+@description('If true, reuse existing Azure AI Search Service')
+output USE_EXISTING_AI_SEARCH bool = useExistingAiSearch
 
 /* --------------------------- Apps Deployment ----------------------------- */
 
-@description('The endpoint of the container registry.') // necessary for azd deploy
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
-
 @description('Endpoint URL of the Frontend service')
-output SERVICE_FRONTEND_URL string = frontendApp.outputs.URL
+output SERVICE_FRONTEND_URL string = app.outputs.frontendAppUrl
 
 @description('Endpoint URL of the Backend service')
-output SERVICE_BACKEND_URL string = backendApp.outputs.URL
+output SERVICE_BACKEND_URL string = app.outputs.backendAppUrl
 
+@description('The endpoint of the container registry.') // necessary for azd deploy
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = app.outputs.containerRegistryLoginServer
 
-/* ------------------------ Authentication & RBAC -------------------------- */
-
-@description('Activate authentication if true')
-output USE_AUTHENTICATION bool = useAuthentication
+/* ------------------------ Authentication & RBAC ------------------------- */
 
 @description('ID of the tenant we are deploying to')
 output AZURE_AUTH_TENANT_ID string = authTenantId
@@ -593,35 +558,52 @@ output AZURE_AUTH_TENANT_ID string = authTenantId
 output AZURE_PRINCIPAL_ID string = azurePrincipalId
 
 @description('Application registration client ID')
-output AZURE_CLIENT_APP_ID string = authClientId
+output AZURE_CLIENT_APP_ID string = authClientAppId
 
-/* ------------------------------- Models --------------------------------- */
+/* -------------------------- Azure AI Foundry ----------------------------- */
 
-@description('Azure OpenAI endpoint')
-output AZURE_OPENAI_ENDPOINT string = azureOpenAiApiEndpoint
+@description('Azure AI Project connection string')
+output AZURE_AI_PROJECT_CONNECTION_STRING string = aiProject.outputs.connectionString
 
-@description('Azure OpenAI API Version')
-output AZURE_OPENAI_API_VERSION string = azureOpenAiApiVersion
+/* ---------------------------- Azure OpenAI ------------------------------- */
+
+@description('Azure OpenAI service name')
+output AZURE_OPENAI_NAME string = _azureOpenAiName
+
+@description('Azure OpenAI endpoint - Base URL for API calls to Azure OpenAI')
+output AZURE_OPENAI_ENDPOINT string = _azureOpenAiEndpoint
+
+@description('Azure OpenAI API Version - API version to use when calling Azure OpenAI')
+output AZURE_OPENAI_API_VERSION string = _azureOpenAiApiVersion
 
 @description('Azure OpenAI Model Deployment Name - Executor Service')
-output EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME string = executorAzureOpenAiDeploymentName
+output EXECUTOR_AZURE_OPENAI_DEPLOYMENT_NAME string = _executorAzureOpenAiDeploymentName
 
 @description('Azure OpenAI Model Deployment Name - Utility Service')
-output UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME string = utilityAzureOpenAiDeploymentName
+output UTILITY_AZURE_OPENAI_DEPLOYMENT_NAME string = _utilityAzureOpenAiDeploymentName
 
-@description('Azure OpenAI Model Deployment Name: Planner')
-output PLANNER_AZURE_OPENAI_DEPLOYMENT_NAME string = plannerAzureOpenAiDeploymentName
+@description('JSON deployment configuration for the models')
+output AZURE_OPENAI_DEPLOYMENTS object[] = deployments
 
-@description('Azure OpenAI endpoint: Planner')
-output PLANNER_AZURE_OPENAI_ENDPOINT string = plannerAzureOpenAiApiEndpoint
+/* ------------------------------ AI Search --------------------------------- */
 
-@description('Azure OpenAI API Version: Planner')
-output PLANNER_AZURE_OPENAI_API_VERSION string = plannerAzureOpenAiApiVersion
+@description('Azure AI Search service name')
+output AZURE_AI_SEARCH_NAME string = _azureAiSearchName
 
-@description('Azure OpenAI Key: Planner')
-output plannerkeysecret string = plannerKeyParam
+@description('Azure AI Search service resource group name')
+output AZURE_AI_SEARCH_RESOURCE_GROUP_NAME string = azureAiSearchResourceGroupName
 
-/* --------------------------- Observability ------------------------------ */
+@description('Azure AI Search deployment location')
+output AZURE_AI_SEARCH_LOCATION string = azureAiSearchLocation
+
+@description('Azure AI Search endpoint SKU name')
+output AZURE_AI_SEARCH_SKU_NAME string = aiSearchSkuName
+
+@description('Azure OpenAI endpoint - Base URL for API calls to Azure OpenAI')
+// This environment variable name is used as a default by Semantic Kernel
+output AZURE_AI_SEARCH_ENDPOINT string = _azureAiSearchEndpoint
+
+/* -------------------------- Diagnostic Settings --------------------------- */
 
 @description('Application Insights name')
 output AZURE_APPLICATION_INSIGHTS_NAME string = appInsightsComponent.outputs.name

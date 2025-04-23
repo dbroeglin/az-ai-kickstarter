@@ -18,6 +18,9 @@ if [[ "${USE_AUTHENTICATION-}" =~ "true" ]]; then
   if [ ! -z "$AZURE_APP_ID" ]; then
     echo "Deleting app $AZURE_CLIENT_APP_ID..."
     az ad app delete --id "$AZURE_APP_ID"
+
+    azd env set AZURE_CLIENT_APP_ID ""
+    azd env set AZURE_CLIENT_APP_SECRET ""
   fi
 fi
 

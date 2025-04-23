@@ -5,7 +5,7 @@ if ($env:DEBUG -match '^1|yes|true$') {
 }
 
 if ($env:USE_AUTHENTICATION -match "true") {
-    Write-Host "    ➜ " -ForegroundColor Green -NoNewline
+    Write-Host "  ➜ " -ForegroundColor Green -NoNewline
     Write-Host "Authentication is enabled creating app registration..."
 
     if (-not $env:AZURE_AUTH_TENANT_ID) {
@@ -37,7 +37,7 @@ if ($env:USE_AUTHENTICATION -match "true") {
             --identifier-uris "api://$AZURE_CLIENT_APP_ID" `
             --enable-id-token-issuance true `
             --enable-access-token-issuance true `
-            --required-resource-accesses @scripts/requiredResourceAccess.json
+            --required-resource-accesses @infra/hooks/requiredResourceAccess.json
 
         $SERVICE_PRINCIPAL_ID = az ad sp create `
             --id $AZURE_CLIENT_APP_ID `
@@ -59,13 +59,13 @@ if ($env:USE_AUTHENTICATION -match "true") {
             --method PATCH `
             --headers 'Content-Type=application/json' `
             --uri "https://graph.microsoft.com/v1.0/applications/$azure_app_object_id" `
-            --body @scripts/oauth2PermissionScopes.json
+            --body @infra/hooks/oauth2PermissionScopes.json
 
         az rest `
             --method PATCH `
             --headers 'Content-Type=application/json' `
             --uri "https://graph.microsoft.com/v1.0/applications/$azure_app_object_id" `
-            --body @scripts/preAuthorizedApplications.json
+            --body @infra/hooks/preAuthorizedApplications.json
 
         azd env set AZURE_CLIENT_APP_SECRET $AZURE_CLIENT_APP_SECRET
 
@@ -77,7 +77,7 @@ if ($env:USE_AUTHENTICATION -match "true") {
 
     azd env set AZURE_CLIENT_APP_ID $AZURE_CLIENT_APP_ID
 
-    Write-Host "    ➜ " -ForegroundColor Green -NoNewline
+    Write-Host "  ➜ " -ForegroundColor Green -NoNewline
     Write-Host "Application registration $app_name ($AZURE_CLIENT_APP_ID) has been created."
 
     # Credits: inspired by https://gpiskas.com/posts/automate-creation-app-registration-azure-cli/#creating-and-modifying-the-app-registration
