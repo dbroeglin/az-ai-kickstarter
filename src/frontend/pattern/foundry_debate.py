@@ -1,15 +1,16 @@
 import datetime
 import logging
-
+import os
 from collections.abc import Awaitable, Callable
 
 from azure.ai.agents.models import Agent as AzureAIAgentModel
+from azure.ai.inference.aio import ChatCompletionsClient
 from azure.ai.projects.aio import AIProjectClient
 from azure.identity.aio import DefaultAzureCredential
 from opentelemetry.trace import get_tracer
+from pydantic import ConfigDict
 from semantic_kernel.agents import GroupChatOrchestration
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.agents.orchestration.group_chat import (
     BooleanResult,
     GroupChatManager,
@@ -17,9 +18,13 @@ from semantic_kernel.agents.orchestration.group_chat import (
     StringResult,
 )
 from semantic_kernel.agents.runtime import InProcessRuntime
+from semantic_kernel.connectors.ai.azure_ai_inference import (
+    AzureAIInferenceChatCompletion,
+)
 from semantic_kernel.connectors.ai.chat_completion_client_base import (
     ChatCompletionClientBase,
 )
+from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.connectors.ai.prompt_execution_settings import (
     PromptExecutionSettings,
 )
@@ -36,6 +41,16 @@ from utils import get_model_deployment
 
 logger = logging.getLogger(__name__)
 
+
+class StrictStringResult(StringResult):
+    # Required to avoid: 
+    # Invalid schema for response_format 'StringResult': In context=(), 'additionalProperties' is required to be supplied and to be false.
+    model_config = ConfigDict(extra="forbid")
+
+class StrictBooleanResult(BooleanResult):
+    # Required to avoid: 
+    # Invalid schema for response_format 'StringResult': In context=(), 'additionalProperties' is required to be supplied and to be false.
+    model_config = ConfigDict(extra="forbid")    
 
 class ChatCompletionGroupChatManager(GroupChatManager):
     agent_names: list[str]
@@ -125,22 +140,21 @@ class ChatCompletionGroupChatManager(GroupChatManager):
             ),
         )
 
-        response = await self.service.get_chat_message_content(
+        response = await self.service.get_chat_message_content(            
             chat_history,
             settings=PromptExecutionSettings(
-                response_format=BooleanResult,
+                response_format=StrictBooleanResult,
                 temperature=0.0,
-            ) 
-                                            
+            ),
         )
 
         termination_with_reason = BooleanResult.model_validate_json(response.content)
 
-        print("********************* should_terminate *********************")
-        print(
-            f"Should terminate: {termination_with_reason.result}\nReason: {termination_with_reason.reason}."
+        logger.debug(
+            "Should terminate: %s | Reason: %s.",
+            termination_with_reason.result,
+            termination_with_reason.reason,
         )
-        print("*********************")
 
         return termination_with_reason
 
@@ -179,7 +193,7 @@ class ChatCompletionGroupChatManager(GroupChatManager):
         response = await self.service.get_chat_message_content(
             chat_history,
             settings=PromptExecutionSettings(
-                response_format=StringResult,
+                response_format=StrictStringResult,                
                 temperature=0.0,
             ),
         )
@@ -188,11 +202,11 @@ class ChatCompletionGroupChatManager(GroupChatManager):
             response.content
         )
 
-        print("********************* select_next_agent *********************")
-        print(
-            f"Next participant: {participant_name_with_reason.result}\nReason: {participant_name_with_reason.reason}."
+        logger.debug(
+            "Next participant: %s | Reason: %s.",
+            participant_name_with_reason.result,
+            participant_name_with_reason.reason,
         )
-        print("*********************")
 
         if participant_name_with_reason.result in participant_descriptions:
             return participant_name_with_reason
@@ -229,6 +243,20 @@ class FoundryDebateOrchestrator:
         self.credential = credential
         self.deployment_name = deployment_name
         self.api_version = api_version
+        self.kernel = Kernel()
+        self.kernel.add_service(
+            AzureAIInferenceChatCompletion(
+                service_id="utility",
+                ai_model_id=get_model_deployment("gpt-4.1-mini").name,
+                client=ChatCompletionsClient(
+                    # Using OpenAI endpoint for structured output (see test_ai_inference.py)
+                    endpoint=f"{os.environ["AZURE_OPENAI_ENDPOINT"]}/deployments/{deployment_name}",
+                    credential=credential,
+                    credential_scopes=["https://cognitiveservices.azure.com/.default"],
+                    api_version=os.environ["AZURE_OPENAI_API_VERSION"],
+                ),
+            )
+        )
 
     async def process_conversation(
         self,
@@ -238,28 +266,26 @@ class FoundryDebateOrchestrator:
         agent_response_callback: Callable[[ChatMessageContent], Awaitable[None] | None]
         | None = None,
     ) -> ChatMessageContent:
+
         agents = []
         for agent_definition in self.agent_definitions:
             agents.append(
                 # Wrapping AI Foundry Agents in Semantic Kernel's AzureAIAgent
                 AzureAIAgent(
-                    client=project_client, definition=agent_definition, plugins=[TimePlugin()]
+                    client=project_client,
+                    definition=agent_definition,
+                    plugins=[TimePlugin()],
                 )
             )
 
-        topic = conversation_messages[0]['content']
-        deployment_name = get_model_deployment("gpt-4.1").name
+        topic = conversation_messages[0]["content"]
 
         orchestration = GroupChatOrchestration(
             members=agents,
             manager=ChatCompletionGroupChatManager(
                 topic=topic,
-                agent_names=["Writer"],    
-
-                service=AzureChatCompletion(
-                    deployment_name=deployment_name,
-                    base_url=f"{self.endpoint}/openai/deployments/{deployment_name}",                    
-                ),
+                agent_names=["Writer"],
+                service=self.kernel.get_service("utility"),
             ),
             agent_response_callback=agent_response_callback,
         )
@@ -276,7 +302,6 @@ class FoundryDebateOrchestrator:
                 runtime=runtime,
             )
             value: ChatMessageContent = await orchestration_result.get()
-            print(value)
 
         await runtime.stop_when_idle()
         return value

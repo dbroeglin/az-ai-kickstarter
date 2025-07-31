@@ -12,6 +12,8 @@ from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents import (
     AzureAIAgent,
 )
+import logging
+logging.getLogger("azure.identity").setLevel(logging.INFO)
 
 # Load settings
 load_dotenv_from_azd()
@@ -40,6 +42,7 @@ async def orchestrator(mocker):
 
 
 async def test_blog_generation(orchestrator):
+    console.print()
     conversation_messages = [
         {
             "role": "user",
@@ -47,9 +50,10 @@ async def test_blog_generation(orchestrator):
         }
     ]
 
+
     async def agent_response_callback(message: ChatMessageContent) -> None:
         """Callback function to retrieve agent responses."""
-        print(f"**{message.name}**\n{message.content}")
+        console.print(Markdown(f"**{message.name}**\n{message.content}"))
 
     async with AzureAIAgent.create_client(
         credential=DefaultAzureCredential()

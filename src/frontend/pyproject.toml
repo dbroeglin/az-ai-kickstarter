@@ -5,19 +5,20 @@ description = "AI Applications Chassis - AI Apps Best Practices Tailored for Azu
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "python-dotenv ~=1.0.1",
-    "semantic-kernel>=1.32.2",
-    "rich>=14.0.0",
-    "chainlit>=2.5.5",
-    "azure-monitor-opentelemetry-exporter>=1.0.0b38",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.31.1",
-    "opentelemetry-instrumentation>=0.52b1",
-    "azure-monitor-opentelemetry>=1.6.10",
-    "opentelemetry-sdk>=1.31.1",
-    "azure-ai-projects>=1.0.0b11",
-    "opentelemetry-instrumentation-openai-v2>=2.1b0",
-    "azure-core-tracing-opentelemetry>=1.0.0b12",
+    "azure-ai-agents>=1.1.0b1",
     "azure-ai-inference>=1.0.0b9",
+    "azure-ai-projects>=1.0.0b11",
+    "azure-core-tracing-opentelemetry>=1.0.0b12",
+    "azure-monitor-opentelemetry-exporter>=1.0.0b38",
+    "azure-monitor-opentelemetry>=1.6.10",
+    "chainlit>=2.5.5",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.31.1",
+    "opentelemetry-instrumentation-openai-v2>=2.1b0",
+    "opentelemetry-instrumentation>=0.52b1",
+    "opentelemetry-sdk>=1.31.1",
+    "python-dotenv ~=1.0.1",
+    "rich>=14.0.0",
+    "semantic-kernel>=1.35.0",
 ]
 tool.pytest.asyncio_mode = "auto"
 

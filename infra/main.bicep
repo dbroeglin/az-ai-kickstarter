@@ -223,7 +223,7 @@ var _aiFoundryEndpoint = useExistingAiFoundry ? aiFoundryEndpoint : aiFoundryAcc
 var _aiFoundryApiVersion = empty(aiFoundryApiVersion) ? '2025-05-01-preview' : aiFoundryApiVersion
 
 @description('OpenAI API Version')
-var _azureOpenAiApiVersion = empty(azureOpenAiApiVersion) ? '2024-12-01-preview' : azureOpenAiApiVersion
+var _azureOpenAiApiVersion = empty(azureOpenAiApiVersion) ? '2025-01-01-preview' : azureOpenAiApiVersion
 
 var _aiFoundryProjectEndpoint = aiFoundryAccountProject.properties.endpoints['AI Foundry API']
 
@@ -590,6 +590,18 @@ output AI_FOUNDRY_PROJECT_NAME string = aiFoundryAccountProject.name
 @description('AI Foundry endpoint - Base URL for API calls to AI Foundry')
 output AI_FOUNDRY_ENDPOINT string = _aiFoundryEndpoint
 
+@description('AI Foundry inference endpoint - Base URL for API calls to AI Foundry Inference')
+// Used by Semantic Kernel, see https://learn.microsoft.com/en-us/semantic-kernel/concepts/ai-services/chat-completion/
+// and https://github.com/microsoft/semantic-kernel/blob/main/python/samples/concepts/setup/ALL_SETTINGS.md
+output AZURE_AI_INFERENCE_ENDPOINT string = '${_aiFoundryEndpoint}models'
+
+@description('AI Foundry OpenAI inference endpoint - Base URL for API calls to AI Foundry Inference')
+// See also 
+output AZURE_OPENAI_ENDPOINT string = '${_aiFoundryEndpoint}openai'
+
+@description('AI Foundry OpenAI inference API version')
+output AZURE_OPENAI_API_VERSION string = _azureOpenAiApiVersion
+
 @description('AI Foundry Agent Model Deployment Name')
 output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = _aiFoundryAgentModelDeploymentName
 
@@ -597,8 +609,6 @@ output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = _aiFoundryAgentModelDeploym
 @description('AI Foundry API Version - API version to use when calling AI Foundry')
 output AI_FOUNDRY_API_VERSION string = _aiFoundryApiVersion
 
-@description('Azure OpenAI API Version - API version to use when calling Azure OpenAI')
-output AZURE_OPENAI_API_VERSION string = _azureOpenAiApiVersion
 
 // @description('Azure OpenAI Default Model Deployment Name')
 output AI_FOUNDRY_DEPLOYMENT_NAME string = _aiFoundryDeploymentName
