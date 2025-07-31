@@ -109,3 +109,13 @@
 #     name: text-embedding-3-large
 #     version: "1"
 #   versionUpgradeOption: NoAutoUpgrade
+
+# - name: gpt-image-1-2025-04-15
+#   sku:
+#     name: GlobalStandard
+#     capacity: 2
+#   model:
+#     format: OpenAI
+#     name: gpt-image-1
+#     version: 2025-04-15
+#   versionUpgradeOption: OnceNewDefaultVersionAvailable
