@@ -1,10 +1,8 @@
 import datetime
 import logging
-import os
 from collections.abc import Awaitable, Callable
 
-from azure.ai.agents.models import Agent as AzureAIAgentModel
-from azure.ai.inference.aio import ChatCompletionsClient
+from azure.ai.agents.models import Agent
 from azure.ai.projects.aio import AIProjectClient
 from azure.identity.aio import DefaultAzureCredential
 from opentelemetry.trace import get_tracer
@@ -18,13 +16,9 @@ from semantic_kernel.agents.orchestration.group_chat import (
     StringResult,
 )
 from semantic_kernel.agents.runtime import InProcessRuntime
-from semantic_kernel.connectors.ai.azure_ai_inference import (
-    AzureAIInferenceChatCompletion,
-)
 from semantic_kernel.connectors.ai.chat_completion_client_base import (
     ChatCompletionClientBase,
 )
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.connectors.ai.prompt_execution_settings import (
     PromptExecutionSettings,
 )
@@ -36,8 +30,6 @@ from semantic_kernel.functions import (
 )
 from semantic_kernel.kernel import Kernel
 from semantic_kernel.prompt_template import KernelPromptTemplate, PromptTemplateConfig
-
-from utils import get_model_deployment
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +45,7 @@ class StrictBooleanResult(BooleanResult):
     model_config = ConfigDict(extra="forbid")    
 
 class ChatCompletionGroupChatManager(GroupChatManager):
-    agent_names: list[str]
+    last_agent_names: list[str]
     topic: str
     service: ChatCompletionClientBase
 
@@ -79,12 +71,12 @@ class ChatCompletionGroupChatManager(GroupChatManager):
         self,
         topic: str,
         service: ChatCompletionClientBase,
-        agent_names: list[str],
+        last_agent_names: list[str],
         **kwargs,
     ) -> None:
         """Initialize the group chat manager."""
         super().__init__(
-            topic=topic, service=service, agent_names=agent_names, **kwargs
+            topic=topic, service=service, last_agent_names=last_agent_names, **kwargs
         )
 
     async def filter_results(self, chat_history: ChatHistory) -> MessageResult:
@@ -114,15 +106,15 @@ class ChatCompletionGroupChatManager(GroupChatManager):
         The manager will check if the conversation should be terminated after each agent message
         or human input (if applicable).
         """
+        if chat_history.messages[-1].name not in self.last_agent_names:
+            return BooleanResult(
+                result=False,
+                reason=f"We check termination only after {self.last_agent_names}",
+            )
+
         should_terminate = await super().should_terminate(chat_history)
         if should_terminate.result:
             return should_terminate
-
-        if chat_history.messages[-1].name not in self.agent_names:
-            return BooleanResult(
-                result=False,
-                reason=f"We check termination only after {self.agent_names}",
-            )
 
         chat_history.messages.insert(
             0,
@@ -230,33 +222,19 @@ class FoundryDebateOrchestrator:
 
     def __init__(
         self,
-        deployment_name: str,
-        api_version: str,
-        endpoint: str,
-        agent_definitions: list[AzureAIAgentModel],
+        kernel: Kernel,
+        last_agent_names: list[str],
+        agents: list[Agent],
         credential: DefaultAzureCredential,
+        max_rounds: int = 10,
     ):
         logger.info("Semantic Kernel Foundry debate orchestrator initialization...")
 
-        self.endpoint = endpoint
-        self.agent_definitions = agent_definitions
+        self.agents = agents
         self.credential = credential
-        self.deployment_name = deployment_name
-        self.api_version = api_version
-        self.kernel = Kernel()
-        self.kernel.add_service(
-            AzureAIInferenceChatCompletion(
-                service_id="utility",
-                ai_model_id=get_model_deployment("gpt-4.1-mini").name,
-                client=ChatCompletionsClient(
-                    # Using OpenAI endpoint for structured output (see test_ai_inference.py)
-                    endpoint=f"{os.environ["AZURE_OPENAI_ENDPOINT"]}/deployments/{deployment_name}",
-                    credential=credential,
-                    credential_scopes=["https://cognitiveservices.azure.com/.default"],
-                    api_version=os.environ["AZURE_OPENAI_API_VERSION"],
-                ),
-            )
-        )
+        self.kernel = kernel
+        self.max_rounds = max_rounds
+        self.last_agent_names = last_agent_names
 
     async def process_conversation(
         self,
@@ -266,25 +244,14 @@ class FoundryDebateOrchestrator:
         agent_response_callback: Callable[[ChatMessageContent], Awaitable[None] | None]
         | None = None,
     ) -> ChatMessageContent:
-
-        agents = []
-        for agent_definition in self.agent_definitions:
-            agents.append(
-                # Wrapping AI Foundry Agents in Semantic Kernel's AzureAIAgent
-                AzureAIAgent(
-                    client=project_client,
-                    definition=agent_definition,
-                    plugins=[TimePlugin()],
-                )
-            )
-
         topic = conversation_messages[0]["content"]
 
         orchestration = GroupChatOrchestration(
-            members=agents,
+            members=self.agents,
             manager=ChatCompletionGroupChatManager(
+                max_rounds=self.max_rounds,
                 topic=topic,
-                agent_names=["Writer"],
+                last_agent_names=self.last_agent_names,
                 service=self.kernel.get_service("utility"),
             ),
             agent_response_callback=agent_response_callback,
