@@ -18,19 +18,15 @@ dependencies = [
     "opentelemetry-sdk>=1.31.1",
     "python-dotenv ~=1.0.1",
     "rich>=14.0.0",
-    "semantic-kernel>=1.35.0",
+    "semantic-kernel>=1.35.2",
 ]
-tool.pytest.asyncio_mode = "auto"
 
 [tool.ruff]
 target-version = "py312"
 
-
 [tool.pytest.ini_options]
 testpaths = "tests"
-pythonpath = [
-    "./",
-]
+pythonpath = ["./"]
 asyncio_mode = "auto"
 
 [dependency-groups]
