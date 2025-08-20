@@ -133,15 +133,6 @@ param frontendContainerAppName string = ''
 @description('Set if the frontend container app already exists.')
 param frontendExists bool = false
 
-/* --------------------------------- Backend -------------------------------- */
-
-@maxLength(32)
-@description('Name of the backend container app to deploy. If not specified, a name will be generated. The maximum length is 32 characters.')
-param backendContainerAppName string = ''
-
-@description('Set if the backend container app already exists.')
-param backendExists bool = false
-
 /* -------------------------------------------------------------------------- */
 /*                                  VARIABLES                                 */
 /* -------------------------------------------------------------------------- */
@@ -238,7 +229,7 @@ var _azureAiSearchEndpoint = 'https://${_azureAiSearchName}.search.windows.net'
 
 //------------------------------ AI Foundry  ------------------------------ */
 
-module aiFoundryAccount 'br/public:avm/res/cognitive-services/account:0.11.0' = if (!useExistingAiFoundry) {
+module aiFoundryAccount 'br/public:avm/res/cognitive-services/account:0.13.1' = if (!useExistingAiFoundry) {
   name: '${deployment().name}-aiFoundryAccount'
   params: {
     name: _aiFoundryAccountName
@@ -343,7 +334,7 @@ resource aiFoundryAccountProject 'Microsoft.CognitiveServices/accounts/projects@
 var _aiFoundryDeploymentName = deployments[0].name
 
 // ------------------------------ Storage Account ------------------------------
-module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
+module storageAccount 'br/public:avm/res/storage/storage-account:0.26.0' = {
   name: '${deployment().name}-storageAccount'
   scope: resourceGroup()
   params: {
@@ -352,6 +343,19 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
     name: _storageAccountName
     kind: 'StorageV2'
     skuName: 'Standard_ZRS'
+    publicNetworkAccess: 'Enabled' 
+    networkAcls: {
+      // Necessary for the user to work directly with the storage account
+      defaultAction: 'Allow'
+    }
+    roleAssignments: [
+      // TODO: review and make work for AI Foundry Evaluations
+      {
+        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
+        principalId: azurePrincipalId
+        principalType: 'User'
+      }      
+    ]
     blobServices: {
       corsRules: [
         {
@@ -395,11 +399,6 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
         }
       ]
       roleAssignments: [
-        // TODO: review and make work for AI Foundry Evaluations
-        {
-          roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-          principalId: azurePrincipalId
-        }
       ]
       deleteRetentionPolicy: {
         allowPermanentDelete: false
@@ -557,6 +556,7 @@ output USE_EXISTING_AI_SEARCH bool = useExistingAiSearch
 // output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
 @description('The endpoint of the container registry.') // necessary for azd deploy
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = app.outputs.containerRegistryLoginServer
+
 /* ------------------------ Authentication & RBAC ------------------------- */
 
 @description('ID of the tenant we are deploying to')

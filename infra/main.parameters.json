@@ -25,9 +25,6 @@
     "frontendExists": {
       "value": "${SERVICE_FRONTEND_RESOURCE_EXISTS=false}"
     },
-    "backendExists": {
-      "value": "${SERVICE_BACKEND_RESOURCE_EXISTS=false}"
-    },
 
     "authTenantId": {
       "value": "${AZURE_AUTH_TENANT_ID}"
