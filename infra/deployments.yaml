@@ -1,5 +1,36 @@
 # This file contains the deployment configurations for the project
 # The first model is the default model used in the project and for agents
+
+# - name: gpt-5-2025-08-07
+#   sku:
+#     name: GlobalStandard
+#     capacity: 150
+#   model:
+#     format: OpenAI
+#     name: gpt-5
+#     version: 2025-08-07
+#   versionUpgradeOption: OnceCurrentVersionExpired
+
+# - name: gpt-5-mini-2025-08-07
+#   sku:
+#     name: GlobalStandard
+#     capacity: 150
+#   model:
+#     format: OpenAI
+#     name: gpt-5-mini
+#     version: 2025-08-07
+#   versionUpgradeOption: OnceCurrentVersionExpired
+
+# - name: gpt-5-nano-2025-08-07
+#   sku:
+#     name: GlobalStandard
+#     capacity: 150
+#   model:
+#     format: OpenAI
+#     name: gpt-5-nano
+#     version: 2025-08-07
+#   versionUpgradeOption: OnceCurrentVersionExpired
+
 - name: gpt-4.1-2025-04-14
   sku:
     name: GlobalStandard
