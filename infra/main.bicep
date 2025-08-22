@@ -216,6 +216,9 @@ var _aiFoundryApiVersion = empty(aiFoundryApiVersion) ? '2025-05-01-preview' : a
 @description('OpenAI API Version')
 var _azureOpenAiApiVersion = empty(azureOpenAiApiVersion) ? '2025-01-01-preview' : azureOpenAiApiVersion
 
+@description('OpenAI Endpoint')
+var _azureOpenAiEndpoint = '${_aiFoundryEndpoint}openai'
+
 var _aiFoundryProjectEndpoint = aiFoundryAccountProject.properties.endpoints['AI Foundry API']
 
 var _azureAiSearchLocation = empty(azureAiSearchLocation) ? location : azureAiSearchLocation
@@ -478,6 +481,7 @@ module app 'modules/app.bicep' = {
     aiFoundryEndpoint: _aiFoundryEndpoint
     aiFoundryDeployments: deployments
     aiFoundryApiVersion: _aiFoundryApiVersion
+    azureOpenAiEndpoint: _azureOpenAiEndpoint
     azureOpenAiApiVersion: _azureOpenAiApiVersion 
 
     aiFoundryProjectEndpoint: _aiFoundryProjectEndpoint
@@ -577,7 +581,7 @@ output AI_FOUNDRY_PROJECT_ENDPOINT string = _aiFoundryProjectEndpoint
 output AZURE_AI_FOUNDRY_PROJECT_ENDPOINT string = aiFoundryAccountProject.properties.endpoints['AI Foundry API']
 
 @description('Azure AI Foundry Project Endpoint - Base URL for API calls to AI Foundry Project')
-// Duplicate of AI_FOUNDRY_PROJECT_ENDPOINT because it is used by SK; 
+// Duplicate of AI_FOUNDRY_PROJECT_ENDPOINT because it is used by Semantic Kernel, see 
 // https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-types/azure-ai-agent
 output AZURE_AI_AGENT_ENDPOINT string = _aiFoundryProjectEndpoint
 
@@ -596,8 +600,7 @@ output AI_FOUNDRY_ENDPOINT string = _aiFoundryEndpoint
 output AZURE_AI_INFERENCE_ENDPOINT string = '${_aiFoundryEndpoint}models'
 
 @description('AI Foundry OpenAI inference endpoint - Base URL for API calls to AI Foundry Inference')
-// See also 
-output AZURE_OPENAI_ENDPOINT string = '${_aiFoundryEndpoint}openai'
+output AZURE_OPENAI_ENDPOINT string = _azureOpenAiEndpoint
 
 @description('AI Foundry OpenAI inference API version')
 output AZURE_OPENAI_API_VERSION string = _azureOpenAiApiVersion
