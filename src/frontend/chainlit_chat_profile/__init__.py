@@ -12,6 +12,21 @@ from semantic_kernel.contents import ChatMessageContent
 
 from pattern.debate import DebateOrchestrator
 from pattern.foundry_debate import FoundryDebateOrchestrator
+from semantic_kernel.connectors.ai.azure_ai_inference import (
+    AzureAIInferenceChatCompletion,
+)
+from semantic_kernel.core_plugins.time_plugin import TimePlugin
+from semantic_kernel.kernel import Kernel
+
+from semantic_kernel.agents import (
+    AzureAIAgent,
+)
+from azure.ai.inference.aio import ChatCompletionsClient
+import os
+
+from semantic_kernel.contents.text_content import TextContent
+from semantic_kernel.contents.function_result_content import FunctionResultContent
+from semantic_kernel.contents.function_call_content import FunctionCallContent
 
 
 class AIFoundryAgentProfile:
@@ -100,20 +115,61 @@ class DebateProfile:
 class FoundryDebateProfile:
     def __init__(
         self,
-        endpoint: str,
-        api_version: str,
         deployment_name: str,
-        agent_definitions: list[Agent],
+        azure_ai_agents: list[Agent],
         credential: DefaultAzureCredential,
     ):
-        self.orchestrator = FoundryDebateOrchestrator(
-            endpoint=endpoint,
-            api_version=api_version,
+        self.project_client = AzureAIAgent.create_client(credential=credential)
+        self.orchestrator = self.create_orchestrator(
             deployment_name=deployment_name,
+            azure_ai_agents=azure_ai_agents,
             credential=credential,
-            agent_definitions=agent_definitions,
+            project_client=self.project_client,
         )
         self.credentials = credential
+
+    @staticmethod
+    def create_orchestrator(
+        deployment_name: str,
+        azure_ai_agents: list[Agent],
+        credential: DefaultAzureCredential,
+        project_client: AIProjectClient,
+    ):
+        kernel = Kernel()
+        kernel.add_plugin(TimePlugin(), plugin_name="time")
+
+        kernel.add_service(
+            AzureAIInferenceChatCompletion(
+                service_id="utility",
+                ai_model_id=deployment_name,
+                client=ChatCompletionsClient(
+                    # Using OpenAI endpoint for structured output (see test_ai_inference.py)
+                    endpoint=f"{os.environ['AZURE_OPENAI_ENDPOINT']}/deployments/{deployment_name}",
+                    credential=credential,
+                    credential_scopes=["https://cognitiveservices.azure.com/.default"],
+                    api_version=os.environ["AZURE_OPENAI_API_VERSION"],
+                ),
+            )
+        )
+        agents = [
+            # Wrapping AI Foundry Agents in Semantic Kernel's AzureAIAgent
+            AzureAIAgent(
+                client=project_client,
+                definition=definition,
+                plugins=[TimePlugin()],  # TODO: translate from YAML spec?
+            )
+            for definition in azure_ai_agents
+            if definition.name in ["Writer", "Critic"]
+        ]
+        return FoundryDebateOrchestrator(
+            kernel=kernel,
+            agents=agents,
+            credential=credential,
+            max_rounds=6,
+            last_agent_names=[
+                "Writer"
+            ],  # Only Writer's last response is used for final output
+        )
 
     @property
     def name(self) -> str:
@@ -133,26 +189,33 @@ class FoundryDebateProfile:
     async def run(
         self, client: AIProjectClient, message: cl.Message, response: cl.Message
     ) -> None:
-        async def call_back(message: ChatMessageContent) -> None:
-            # await response.stream_token(f"**{message.name}**\n{message.content}")
-            async with cl.Step(name=f"Agent {message.name}") as step:
-                step.output = message.content
-                                 
-        # See https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-types/azure-ai-agent
-        async with AzureAIAgent.create_client(
-            credential=self.credentials
-        ) as project_client:
-            final_message = await self.orchestrator.process_conversation(
-                project_client=project_client,
-                user_id="default_user",  # TODO
-                conversation_messages=[
-                    {"role": "user", "name": "user", "content": message.content}
-                ],
-                agent_response_callback=call_back,
-            )
+        async def callback(message: ChatMessageContent) -> None:
+            def extract_content(message: ChatMessageContent) -> str:
+                for item in message.items:
+                    match item:
+                        case TextContent():
+                            return item.text
+                        case FunctionCallContent():
+                            return f"Tool call: {item.plugin_name}.{item.function_name}({item.arguments})"
+                        case FunctionResultContent():
+                            return f"Tool result: {item.result}"
 
-            final_response = cl.Message(
-                content=final_message.content,
-                author=final_message.name,
-            )
-            await final_response.send()
+            async with cl.Step(name=f"Agent {message.name}", type="llm") as step:
+                step.output = extract_content(message)
+
+        # See https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-types/azure-ai-agent
+
+        final_message = await self.orchestrator.process_conversation(
+            project_client=self.project_client,
+            user_id="default_user",  # TODO
+            conversation_messages=[
+                {"role": "user", "name": "user", "content": message.content}
+            ],
+            agent_response_callback=callback,
+        )
+
+        final_response = cl.Message(
+            content=final_message.content,
+            author=final_message.name,
+        )
+        await final_response.send()

@@ -1,89 +1,103 @@
+import logging
+import os
+from unittest import case
+
 import pytest
+from azure.ai.inference.aio import ChatCompletionsClient
+from azure.identity.aio import DefaultAzureCredential
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from semantic_kernel.contents.chat_message_content import ChatMessageContent
-
-from pattern.foundry_debate import FoundryDebateOrchestrator
-from utils import load_dotenv_from_azd, get_model_deployment
-import os
-from azure.identity.aio import DefaultAzureCredential
-from semantic_kernel.connectors.ai.azure_ai_inference import (
-    AzureAIInferenceChatCompletion,
-)
-from semantic_kernel.core_plugins.time_plugin import TimePlugin
-from semantic_kernel.kernel import Kernel
-
 from semantic_kernel.agents import (
     AzureAIAgent,
 )
-from azure.ai.inference.aio import ChatCompletionsClient
-import logging
+from semantic_kernel.contents.text_content import TextContent
+from semantic_kernel.contents.function_result_content import FunctionResultContent
+from semantic_kernel.contents.function_call_content import FunctionCallContent
+
+from semantic_kernel.connectors.ai.azure_ai_inference import (
+    AzureAIInferenceChatCompletion,
+)
+from semantic_kernel.contents.chat_message_content import ChatMessageContent
+from semantic_kernel.core_plugins.time_plugin import TimePlugin
+from semantic_kernel.kernel import Kernel
+
+
+from azure.ai.projects.aio import AIProjectClient
+
+from chainlit_chat_profile import FoundryDebateProfile
+from pattern.foundry_debate import FoundryDebateOrchestrator
+from utils import get_model_deployment, load_dotenv_from_azd
+
 logging.getLogger("azure.identity").setLevel(logging.INFO)
+logging.getLogger("markdown_it").setLevel(logging.WARNING)
 
 # Load settings
 load_dotenv_from_azd()
 
 console = Console()
 
+
 @pytest.fixture()
-async def orchestrator(mocker):
+def credential() -> DefaultAzureCredential:
+    return DefaultAzureCredential()
+
+
+@pytest.fixture()
+def project_client(credential) -> AIProjectClient:
+    return AzureAIAgent.create_client(credential=credential)
+
+
+@pytest.fixture()
+async def orchestrator(mocker, project_client, credential) -> FoundryDebateOrchestrator:
     mocker.patch(
         "semantic_kernel.core_plugins.time_plugin.TimePlugin.date",
         return_value="Sunday, 12 January, 2031",
     )
-    credential = DefaultAzureCredential()
-    project_client = AzureAIAgent.create_client(credential=credential)
 
-    deployment_name = get_model_deployment("gpt-4.1-mini").name
-    kernel = Kernel()
-    kernel.add_plugin(TimePlugin(), plugin_name="time")
-    
-    kernel.add_service(
-        AzureAIInferenceChatCompletion(
-            service_id="utility",
-            ai_model_id=deployment_name,
-            client=ChatCompletionsClient(
-                # Using OpenAI endpoint for structured output (see test_ai_inference.py)
-                endpoint=f"{os.environ["AZURE_OPENAI_ENDPOINT"]}/deployments/{deployment_name}",
-                credential=credential,
-                credential_scopes=["https://cognitiveservices.azure.com/.default"],
-                api_version=os.environ["AZURE_OPENAI_API_VERSION"],
-            ),
-        )
-    )
-    agents = [
-        # Wrapping AI Foundry Agents in Semantic Kernel's AzureAIAgent
-        AzureAIAgent(
-                    client=project_client,
-                    definition=definition,
-                    plugins=[TimePlugin()], # TODO: translate from YAML spec?
-        )
-        async for definition in project_client.agents.list_agents()
-        if definition.name in ["Writer", "Critic"]
-    ]
-    return FoundryDebateOrchestrator(
-        kernel=kernel,
-        agents=agents,
+    return FoundryDebateProfile.create_orchestrator(
+        deployment_name=get_model_deployment("gpt-4.1-mini").name,
+        azure_ai_agents=[
+            definition async for definition in project_client.agents.list_agents()
+        ],
         credential=credential,
-        max_rounds=6,
-        last_agent_names=["Writer"],  # Only Writer's last response is used for final output
+        project_client=project_client,
+    )
+
+
+async def agent_response_callback(message: ChatMessageContent) -> None:
+    """Callback function that gets intermediary agent responses and
+    prints them.
+    """
+
+    def extract_content(message: ChatMessageContent) -> str:
+        for item in message.items:
+            match item:
+                case TextContent():
+                    return item.text
+                case FunctionCallContent():
+                    return f"Tool call: {item.plugin_name}.{item.function_name}({item.arguments})"
+                case FunctionResultContent():
+                    return f"Tool result: {item.result}"
+        return ""
+
+    console.print(message)
+    console.print(
+        Panel(
+            Markdown(extract_content(message)),
+            title=f"Agent: {message.name} ({message.role.name})",
+        )
     )
 
 
 async def test_blog_generation(orchestrator):
-    console.print() # start an a blank line
+    console.print()  # start an a blank line
     conversation_messages = [
         {
             "role": "user",
             "content": "A blog about cookies",
         }
     ]
-
-    async def agent_response_callback(message: ChatMessageContent) -> None:
-        """Callback function to retrieve agent responses."""
-        console.print(message)
-        console.print(Panel(Markdown(message.content), title=f"Agent: {message.name} ({message.role.name})"))
 
     async with AzureAIAgent.create_client(
         credential=DefaultAzureCredential()

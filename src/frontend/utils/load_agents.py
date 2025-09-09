@@ -13,6 +13,7 @@ from semantic_kernel.agents import (
 load_dotenv_from_azd()
 console = Console()
 
+
 async def main() -> None:
     """Main function to load agents from YAML files and create/update them in Azure AI."""
     async with (
@@ -24,7 +25,7 @@ async def main() -> None:
         if os.environ.get("DELETE_ALL") is not None:
             for agent in agents.values():
                 console.print(
-                    f"Deleting agent: [bold cyan]{agent.name}[/] - [blue]{agent.description}[/]..."
+                    f"Deleting agent: [bold cyan]{agent.name}[/] [gray]({agent.description})[/]..."
                 )
                 await client.agents.delete_agent(agent_id=agent.id)
             agents = {}
@@ -40,12 +41,12 @@ async def main() -> None:
 
             if agent_spec["name"] not in agents:
                 console.print(
-                    f"Creating agent: [bold cyan]{agent_spec['name']}[/] - [blue]{agent_spec.get('description')}[/]..."
+                    f"Creating agent: [bold cyan]{agent_spec['name']}[/] [gray]({agent_spec['description']})[/]..."
                 )
                 await client.agents.create_agent(**agent_spec)
             else:
                 console.print(
-                    f"Agent [bold cyan]{agent_spec['name']}[/] - [blue]{agents[agent_spec['name']].description}[/] already exists, updating..."
+                    f"Agent [bold cyan]{agent_spec['name']}[/] [gray]({agents[agent_spec['name']].description})[/] already exists, updating..."
                 )
                 for t in agents[agent_spec["name"]].tools:
                     console.print(f"  - Tool: [bold cyan]{t}[/]")

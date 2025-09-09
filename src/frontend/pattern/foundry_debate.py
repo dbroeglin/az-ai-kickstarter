@@ -35,14 +35,16 @@ logger = logging.getLogger(__name__)
 
 
 class StrictStringResult(StringResult):
-    # Required to avoid: 
+    # Required to avoid:
     # Invalid schema for response_format 'StringResult': In context=(), 'additionalProperties' is required to be supplied and to be false.
     model_config = ConfigDict(extra="forbid")
 
+
 class StrictBooleanResult(BooleanResult):
-    # Required to avoid: 
+    # Required to avoid:
     # Invalid schema for response_format 'StringResult': In context=(), 'additionalProperties' is required to be supplied and to be false.
-    model_config = ConfigDict(extra="forbid")    
+    model_config = ConfigDict(extra="forbid")
+
 
 class ChatCompletionGroupChatManager(GroupChatManager):
     last_agent_names: list[str]
@@ -51,7 +53,7 @@ class ChatCompletionGroupChatManager(GroupChatManager):
 
     termination_prompt: str = (
         "You are mediator that guides a discussion on the topic of '{{$topic}}'. "
-        "Check the **last** provided evaluation and terminate if the evaluated score is higher or equal to 9. "
+        "Check the **last** provided evaluation and terminate if the evaluated score is higher or equal to 8. "
     )
 
     selection_prompt: str = (
@@ -132,7 +134,7 @@ class ChatCompletionGroupChatManager(GroupChatManager):
             ),
         )
 
-        response = await self.service.get_chat_message_content(            
+        response = await self.service.get_chat_message_content(
             chat_history,
             settings=PromptExecutionSettings(
                 response_format=StrictBooleanResult,
@@ -185,7 +187,7 @@ class ChatCompletionGroupChatManager(GroupChatManager):
         response = await self.service.get_chat_message_content(
             chat_history,
             settings=PromptExecutionSettings(
-                response_format=StrictStringResult,                
+                response_format=StrictStringResult,
                 temperature=0.0,
             ),
         )

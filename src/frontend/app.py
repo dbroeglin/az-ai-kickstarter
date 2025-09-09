@@ -13,7 +13,11 @@ from semantic_kernel.agents import (
 )
 from utils import load_dotenv_from_azd, setup_telemetry, get_model_deployment
 
-from chainlit_chat_profile import AIFoundryAgentProfile, DebateProfile, FoundryDebateProfile
+from chainlit_chat_profile import (
+    AIFoundryAgentProfile,
+    DebateProfile,
+    FoundryDebateProfile,
+)
 
 load_dotenv_from_azd()
 credential = DefaultAzureCredential()
@@ -27,8 +31,8 @@ profiles = []
 @cl.set_chat_profiles
 async def chat_profile():
     logger.info("Loading chat profiles...")
-    async with AzureAIAgent.create_client(credential=credential) as client:
-        azure_ai_agents = [agent async for agent in client.agents.list_agents()]
+    async with AzureAIAgent.create_client(credential=credential) as project_client:
+        azure_ai_agents = [agent async for agent in project_client.agents.list_agents()]
         global profiles
         profiles = [AIFoundryAgentProfile(agent) for agent in azure_ai_agents]
         profiles.append(
@@ -42,15 +46,9 @@ async def chat_profile():
         )
         profiles.append(
             FoundryDebateProfile(
-                endpoint=os.getenv("AI_FOUNDRY_ENDPOINT"),
-                api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-                deployment_name=get_model_deployment("gpt-4.1").name,
+                deployment_name=get_model_deployment("gpt-4.1-mini").name,
                 credential=credential,
-                agent_definitions=[
-                    definition
-                    async for definition in client.agents.list_agents()
-                    if definition.name in ["Writer", "Critic"]
-                ],
+                azure_ai_agents=azure_ai_agents,
             ),
         )
         logger.info(f"Found {len(profiles)} profiles")

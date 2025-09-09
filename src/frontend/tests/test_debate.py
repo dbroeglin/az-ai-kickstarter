@@ -15,6 +15,7 @@ load_dotenv_from_azd()
 
 console = Console()
 
+
 @pytest.fixture()
 def orchestrator(mocker):
     mocker.patch(
